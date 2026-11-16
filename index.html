@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DubsDay</title>
+<meta name="description" content="Line up your squad's schedules and find dub time.">
+<meta name="theme-color" content="#12142b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DubsDay">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@50..150,100..900&family=Instrument+Sans:wght@400..700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* One world: late-night gaming. Phone-width column, schedule as member columns. */
+  --ink:#12142b;        /* night background */
+  --panel:#1c1f3d;      /* raised surfaces */
+  --line:#2e3260;       /* borders, empty cells */
+  --text:#f3f1e7;
+  --muted:#9a9dc4;
+  --solo:#d3b266;       /* available, nobody else yet */
+  --dub:#4aae93;        /* DubTime: 2 or more overlap */
+  --full:#4472e8;       /* Full-Squad DubTime */
+  --full-hot:#8db8ff;
+  --danger:#ff6b6b;
+  --cta:#f5c542;          /* anything that opens the availability dial */
+  --display:"Anybody","Arial Black","Helvetica Neue",sans-serif;
+  --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:#0b0c1c;color:var(--text);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--full-hot);outline-offset:2px}
+.shell{max-width:440px;margin:0 auto;min-height:100%;background:var(--ink);position:relative;display:flex;flex-direction:column}
+@media(min-width:480px){.shell{border-left:1px solid var(--line);border-right:1px solid var(--line)}}
+#app{flex:1;display:flex;flex-direction:column;padding:calc(20px + env(safe-area-inset-top)) 16px 110px;gap:20px}
+h1,h2,h3{font-family:var(--display);font-stretch:125%;font-weight:800;margin:0;text-wrap:balance;line-height:1.05;letter-spacing:-.01em}
+h1{font-size:34px}
+h2{font-size:22px}
+h3{font-size:16px;font-stretch:110%}
+p{margin:0}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;align-items:center;gap:10px}
+.row.wrap{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:12px 16px;font-weight:600;min-height:46px}
+.btn.primary{background:var(--text);color:var(--ink);border-color:var(--text)}
+.btn.google{background:var(--text);color:var(--ink);border-color:var(--text)}
+.btn.create{background:var(--solo);color:var(--ink);border-color:var(--solo)}
+.btn.signin{background:var(--dub);color:var(--ink);border-color:var(--dub)}
+.btn.cta{background:var(--cta);color:var(--ink);border-color:var(--cta)}
+.btn.blue{background:var(--full);border-color:var(--full);color:#fff}
+.btn.ghost{background:transparent}
+.btn.sm{padding:6px 12px;min-height:34px;font-size:14px;border-radius:9px}
+.btn.block{width:100%}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:14px;color:var(--muted)}
+input[type=text],input[type=password],select{background:var(--ink);border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%;min-height:46px}
+select{width:auto;min-height:36px;padding:6px 8px;font-size:14px}
+select.gsel{flex:1;min-width:0;padding:6px 38px 6px 10px;text-overflow:ellipsis;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23f3f1e7' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;background-size:12px 8px}
+.err{color:var(--danger);font-size:14px}
+.av{width:34px;height:34px;border-radius:50%;background:var(--line);display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:14px;flex:none}
+.av.me{background:var(--text);color:var(--ink)}
+.av.xs{width:22px;height:22px;font-size:11px}
+.rnd{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:8px 14px;font-size:14px;font-weight:600;white-space:nowrap}
+.chip.on{background:var(--text);color:var(--ink);border-color:var(--text)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.dot{width:10px;height:10px;border-radius:3px;display:inline-block;flex:none}
+.dot.solo{background:var(--solo)}.dot.dub{background:var(--dub)}.dot.full{background:var(--full)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:6px}
+
+/* intro */
+.wordmark{font-family:var(--display);font-weight:900;font-stretch:150%;font-size:20px;letter-spacing:-.02em}
+.wordmark b{color:var(--full-hot)}
+.hero h1{font-size:46px;font-stretch:140%;font-weight:900}
+.mini{padding:4px 15px 12px;border-radius:16px;background:var(--panel);border:1px solid var(--line)}
+.mini .sched .head{margin-bottom:0;box-shadow:none;position:static;background:transparent;height:auto;border-bottom:0;padding:8px 0 10px}
+.mini .sched .t,.mini .sched .c{height:18px}
+.steps{display:flex;flex-direction:column;gap:10px;counter-reset:s}
+.steps li{list-style:none;display:flex;gap:12px;align-items:flex-start}
+.steps li::before{counter-increment:s;content:counter(s);font-family:var(--display);font-weight:800;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;font-size:13px;flex:none}
+.steps{padding:0;margin:0}
+
+/* tab bar */
+.tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;background:rgba(18,20,43,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr 76px 1fr 1fr;align-items:center;padding:8px 8px calc(8px + env(safe-area-inset-bottom));z-index:20}
+.tabs button{background:none;border:0;padding:8px 0;font-size:13px;font-weight:600;color:var(--muted);border-radius:10px}
+.tabs button.on{color:var(--text)}
+.tabs .plus{width:58px;height:58px;border-radius:50%;background:var(--cta);color:var(--ink);font-family:var(--display);font-size:30px;font-weight:800;margin:-26px auto 0;display:grid;place-items:center;border:4px solid var(--ink);line-height:1}
+
+/* dub time cards */
+.block{border-radius:14px;padding:14px;border:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;gap:6px;text-align:left;width:100%}
+.block.dub{border-color:color-mix(in srgb,var(--dub) 55%,var(--line))}
+.block .tier{font-family:var(--display);font-weight:800;font-stretch:120%;font-size:15px}
+.block.dub .tier{color:var(--dub)}
+.block .when{font-family:var(--display);font-weight:800;font-size:22px;font-stretch:110%;font-variant-numeric:tabular-nums}
+.block.full{background:linear-gradient(135deg,#1b3fb3,var(--full) 55%,#5a93ff);border-color:var(--full-hot);box-shadow:0 0 0 1px rgba(141,184,255,.4),0 8px 34px rgba(43,107,255,.55);position:relative;overflow:hidden;color:#fff}
+.block.full .tier{font-size:24px;font-stretch:150%;font-weight:900;line-height:1}
+.block.full .when{font-size:26px}
+.block.full .muted{color:#d6e4ff}
+.block.full::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.28) 50%,transparent 65%);transform:translateX(-100%);animation:sheen 3.2s ease-in-out infinite}
+.block.full>*{position:relative;z-index:1}
+@keyframes sheen{0%,55%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 6px rgba(68,114,232,.5)}50%{box-shadow:0 0 14px rgba(141,184,255,.7)}}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700}
+.live::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+details.why{font-size:13px}
+details.why summary{cursor:pointer;color:inherit;opacity:.85}
+details.why ol{margin:6px 0 0;padding-left:18px}
+
+/* schedule grid */
+.sched{display:grid;gap:0 4px;position:relative}
+.sched .head{position:sticky;top:0;background:var(--ink);box-shadow:-8px 0 0 var(--ink),8px 0 0 var(--ink);z-index:5;padding:8px 0;height:72px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:600;text-align:center;margin-bottom:9px;min-width:0}
+.sched .head span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.schedwrap{overflow:visible}
+.sched .t{font-size:11px;color:var(--muted);text-align:right;padding-right:6px;height:26px;line-height:1;transform:translateY(-5px);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sched .c{height:26px;background:rgba(46,50,96,.35);border-top:1px solid transparent}
+.sched .c.hr{border-top-color:rgba(46,50,96,.9)}
+.sched .c.mine{cursor:pointer}
+.sched .c.solo,.sched .c.dub,.sched .c.full{border-top-color:transparent}
+.sched .c.solo{background:var(--solo)}
+.sched .c.dub{background:var(--dub)}
+.sched .c.full{background:transparent;position:relative;z-index:2}
+.sched .c.first{border-radius:6px 6px 0 0}.sched .c.last{border-radius:0 0 6px 6px}.sched .c.first.last{border-radius:6px}
+.sched .glow{background:linear-gradient(135deg,#1b3fb3,var(--full) 55%,#5a93ff);border:1px solid var(--full-hot);margin:0 -3px;border-radius:8px;animation:pulse 2.4s ease-in-out infinite;z-index:1;position:relative;overflow:hidden}
+.sched .glow::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.28) 50%,transparent 65%);transform:translateX(-100%);animation:sheen 3.2s ease-in-out infinite}
+.sched .wtag{z-index:3;pointer-events:none;display:grid;place-items:center;font-family:var(--display);font-weight:900;font-stretch:150%;font-size:13px;color:#fff;letter-spacing:.02em;text-shadow:0 1px 6px rgba(0,0,40,.6)}
+.sched .past{opacity:.35}
+.sched .now{height:0;border-top:2px solid var(--text);z-index:4;position:relative}
+.sched .now::before{content:"now";position:absolute;left:0;top:-9px;font-size:10px;background:var(--text);color:var(--ink);padding:0 4px;border-radius:4px;font-weight:700}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(5,6,18,.7);z-index:40;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--ink);border:1px solid var(--line);border-bottom:0;border-radius:22px 22px 0 0;width:100%;max-width:440px;max-height:94%;overflow-y:auto;padding:18px 16px calc(22px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:16px}
+.stepper{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.stepper .val{font-family:var(--display);font-weight:800;font-size:26px;font-variant-numeric:tabular-nums}
+.stepper button{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:var(--panel);font-size:22px;font-weight:700}
+.dialwrap{display:grid;place-items:center}
+#dial{width:min(300px,100%);touch-action:none;user-select:none;-webkit-user-select:none}
+#knobS,#knobE{cursor:grab}
+#dial text{font-family:var(--body);fill:var(--muted);font-size:13px;font-weight:600}
+#dial .big{font-family:var(--display);font-weight:800;font-size:30px;fill:var(--text)}
+#dial .mid{font-size:14px;fill:var(--muted)}
+
+/* banner */
+#toasts{position:fixed;top:10px;left:50%;transform:translateX(-50%);width:calc(100% - 20px);max-width:420px;z-index:60;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.push{pointer-events:auto;background:rgba(40,43,80,.96);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:18px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.5);animation:drop .35s ease-out}
+.push.full{border-color:var(--full-hot);box-shadow:0 0 30px rgba(43,107,255,.6)}
+@keyframes drop{from{transform:translateY(-120%)}to{transform:none}}
+.appicon{width:38px;height:38px;border-radius:9px;background:var(--full);display:grid;place-items:center;font-family:var(--display);font-weight:900;font-stretch:150%;flex:none;color:#fff}
+.push b{display:block;font-size:15px}
+.push span{font-size:14px;color:#d5d6ea}
+
+/* lock screen preview */
+.lock{position:fixed;inset:0;z-index:50;background:radial-gradient(120% 80% at 50% 0%,#2a2f6b,#0b0c1c 70%);display:flex;justify-content:center;overflow-y:auto}
+.lock .in{width:100%;max-width:440px;padding:24px 14px 30px;display:flex;flex-direction:column;gap:10px}
+.lock .clock{font-family:var(--display);font-weight:700;font-size:76px;text-align:center;line-height:1;font-variant-numeric:tabular-nums}
+.lock .date{text-align:center;color:#d5d6ea;margin-bottom:18px}
+.la{background:rgba(20,22,48,.92);border:1px solid var(--full-hot);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.la .bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.la .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--full),var(--full-hot))}
+.la .rem{font-family:var(--display);font-weight:800;font-size:32px;font-variant-numeric:tabular-nums}
+.note{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding-left:10px}
+.rank{font-family:var(--display);font-weight:800;width:26px;text-align:center;flex:none}
+.icon{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:transparent;font-size:15px;padding:0}
+.toggle{width:50px;height:30px;border-radius:99px;border:1px solid var(--line);background:var(--ink);position:relative;flex:none;padding:0}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--muted);transition:transform .15s}
+.toggle[aria-checked=true]{background:var(--dub);border-color:var(--dub)}
+.toggle[aria-checked=true]::after{transform:translateX(20px);background:#fff}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="shell"><div id="app"></div></div>
+<div id="toasts" aria-live="polite"></div>
+<script>
+"use strict";
+/* ---------- time: a dub day runs 4:00am to 4:00am, in 48 half-hour slots ---------- */
+const SLOTS=48, MIN=60000;
+function dubBase(off=0){const d=new Date(Date.now()-4*60*MIN);d.setHours(4,0,0,0);d.setDate(d.getDate()+off);return d}
+function dayKey(off){const d=dubBase(off);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function dayLabel(off,short){if(off===0)return short?"Today":"Today";if(off===1)return "Tomorrow";return dubBase(off).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})}
+function nowSlot(){return Math.floor((Date.now()-dubBase(0).getTime())/(30*MIN))}
+function tl(s){const m=(240+s*30)%1440,h=Math.floor(m/60),mm=m%60,h12=h%12||12;return h12+":"+String(mm).padStart(2,"0")+(h<12?"am":"pm")}
+function range(a,b){return tl(a)+" to "+tl(b)}
+function durLabel(n){const h=Math.floor(n/2),m=n%2?30:0;return (h?h+"h":"")+(h&&m?" ":"")+(m?m+"m":"")}
+function sl(h){return ((h*60-240+1440)%1440)/30}
+function se(h){return sl(h)||SLOTS}
+function slotTime(off,s){return dubBase(off).getTime()+s*30*MIN}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ---------- demo data ---------- */
+const USERS={
+  jules:{name:"Jules",u:"julesgotdubs"},dev:{name:"Dev",u:"devastator"},rico:{name:"Rico",u:"ricochet"},
+  nina:{name:"Nina",u:"ninabyte"},sam:{name:"Sam",u:"samwise_gg"},priya:{name:"Priya",u:"pixelpriya"},chidi:{name:"Chidi",u:"okafor"}
+};
+const GAME_IDEAS=["Gears of War: E-Day","Battlefield 6","Overwatch 2","Helldivers 2","Rocket League","Fortnite","Call of Duty: Warzone","Halo Infinite","Apex Legends","Minecraft"];
+function seedAvail(){
+  let sat=3;for(let o=2;o<7;o++)if(dubBase(o).getDay()===6)sat=o;
+  const W=(off,h1,h2)=>({day:dayKey(off),a:sl(h1),b:se(h2),squads:"all"});
+  return {
+    jules:[W(0,19,23),W(1,21,0),W(sat,12,16),W(sat,18,2)],
+    dev:[W(0,20,1),W(1,20,23),W(sat,13,2)],
+    rico:[W(0,21,2),W(sat,12,17),W(sat,20,2)],
+    nina:[W(0,21.5,1),W(sat,20,0)],
+    sam:[],priya:[],chidi:[]
+  };
+}
+function fresh(){
+  return {v:7,seedDay:dayKey(0),step:"intro",tab:"home",squadId:null,dayOff:0,me:null,
+    myGames:{},
+    games:{
+      jules:[{name:"Gears of War: E-Day",need:"full"},{name:"Overwatch 2",need:"2"},{name:"Battlefield 6",need:"2"},{name:"Helldivers 2",need:"3"}],
+      dev:[{name:"Gears of War: E-Day",need:"full"},{name:"Battlefield 6",need:"2"},{name:"Helldivers 2",need:"3"},{name:"Overwatch 2",need:"2"}],
+      rico:[{name:"Gears of War: E-Day",need:"full"},{name:"Overwatch 2",need:"2"},{name:"Battlefield 6",need:"2"},{name:"Rocket League",need:"2"}],
+      nina:[{name:"Overwatch 2",need:"2"},{name:"Rocket League",need:"2"},{name:"Battlefield 6",need:"2"}],sam:[],priya:[],chidi:[]},
+    squads:[{id:"dubclub",name:"The Dub Club",code:"DUBTIME",members:["jules","dev","rico"]},
+            {id:"late",name:"Late Shift",code:"LATESHIFT",members:["rico","nina"]}],
+    invites:[],
+    friends:[],reqIn:["nina"],reqOut:[],
+    avail:Object.assign({me:[]},seedAvail()),commits:[],
+    notif:{found:true,warn:true,live:true}};
+}
+let S;
+try{S=JSON.parse(localStorage.getItem("dubsday-proto"))}catch(e){}
+if(!S||S.v!==7)S=fresh();
+if(S.seedDay!==dayKey(0)){const mine=S.avail.me;S.avail=Object.assign({me:mine},seedAvail());S.seedDay=dayKey(0)}
+function persist(){try{localStorage.setItem("dubsday-proto",JSON.stringify(S))}catch(e){}}
+let sheet=null, lockOpen=false, formErr="", errAt="", raw=0;
+
+const installed=()=>{try{return navigator.standalone===true||matchMedia("(display-mode: standalone)").matches}catch(e){return false}};
+const person=id=>id==="me"?{name:S.me?S.me.name:"You",u:S.me?S.me.username:"you"}:USERS[id];
+const squad=id=>S.squads.find(q=>q.id===id);
+const mySquads=()=>S.squads.filter(q=>q.members.includes("me"));
+const avatar=id=>`<span class="av ${id==="me"?"me":""}" aria-hidden="true">${esc(person(id).name[0].toUpperCase())}</span>`;
+
+/* ---------- games are ranked per squad ---------- */
+const DEF_GAMES=[{name:"Gears of War: E-Day",need:"full"},{name:"Battlefield 6",need:"2"}];
+const gamesOf=(uid,sq)=>uid==="me"?(S.myGames[sq]||[]):(S.games[uid]||[]);
+const clone=o=>JSON.parse(JSON.stringify(o));
+function startRank(id,thenAvail){
+  const other=Object.keys(S.myGames).find(k=>S.myGames[k].length);
+  S.rankFor=id;S.rankThenAvail=!!thenAvail;S.applyAll=false;S.addOther=false;
+  S.rankDraft=clone(S.myGames[id]&&S.myGames[id].length?S.myGames[id]:other?S.myGames[other]:DEF_GAMES);
+}
+function afterJoin(id){S.step="app";S.tab="squads";S.squadId=id;S.dayOff=0;startRank(id,true)}
+function finishRank(){const then=S.rankThenAvail;S.rankFor=null;S.rankDraft=null;if(then)openSheet()}
+
+/* ---------- scheduling logic ---------- */
+function winOn(w,day){if(w.day===day)return true;if(!w.repeat||w.repeat==="none"||day<w.day)return false;
+  return w.repeat==="daily"||new Date(w.day+"T12:00").getDay()===new Date(day+"T12:00").getDay()}
+function hasUpcomingAvail(){const ns=nowSlot();for(let o=0;o<7;o++){const d=dayKey(o);if(S.avail.me.some(w=>winOn(w,d)&&!(o===0&&w.b<=ns)))return true}return false}
+function isAvail(uid,sq,day,s){
+  const ws=S.avail[uid]||[];
+  if(!ws.some(w=>winOn(w,day)&&w.a<=s&&s<w.b&&(w.squads==="all"||w.squads.includes(sq))))return false;
+  if(uid==="me"&&S.commits.some(c=>c.day===day&&c.a<=s&&s<c.b&&c.squad!==sq))return false;
+  return true;
+}
+function slotMembers(q,day,s){return q.members.filter(m=>isAvail(m,q.id,day,s))}
+function tierOf(k,n){return k>=2&&k===n?"full":k>=2?"dub":k===1?"solo":""}
+/* contiguous runs where the same 2+ members overlap; every run is at least one 30-minute slot */
+function blocks(q,off){
+  const day=dayKey(off),out=[];let cur=null;
+  for(let s=0;s<=SLOTS;s++){
+    const mem=s<SLOTS?slotMembers(q,day,s):[],key=mem.length>=2?mem.join(","):"";
+    if(cur&&cur.key!==key){cur.b=s;out.push(cur);cur=null}
+    if(!cur&&key)cur={key,a:s,members:mem,squad:q.id,off,day,tier:tierOf(mem.length,q.members.length)};
+  }
+  return out;
+}
+/* ranked-choice pick among games that fit the head count */
+function pickGame(q,members){
+  const n=q.members.length,k=members.length,ok=need=>need==="full"?k===n:k>=+need;
+  const blocked=new Set(),seen=new Set();
+  members.forEach(m=>gamesOf(m,q.id).forEach(g=>{seen.add(g.name);if(!ok(g.need))blocked.add(g.name)}));
+  const alive=new Set([...seen].filter(g=>!blocked.has(g)));
+  const ballots=members.map(m=>gamesOf(m,q.id).map(g=>g.name).filter(g=>alive.has(g)));
+  const borda={};ballots.forEach(b=>b.forEach((g,i)=>borda[g]=(borda[g]||0)+5-i));
+  const rounds=[];
+  while(alive.size){
+    const tally={};alive.forEach(g=>tally[g]=0);let active=0;
+    ballots.forEach(b=>{const c=b.find(g=>alive.has(g));if(c){tally[c]++;active++}});
+    if(!active)break;
+    const order=[...alive].sort((x,y)=>tally[y]-tally[x]||borda[y]-borda[x]||x.localeCompare(y));
+    const rd=order.filter(g=>tally[g]>0).map(g=>({game:g,voters:members.filter((m,i)=>ballots[i].find(x=>alive.has(x))===g)}));
+    if(!rounds.length||JSON.stringify(rounds[rounds.length-1])!==JSON.stringify(rd))rounds.push(rd);
+    if(tally[order[0]]>active/2||alive.size===1)return {game:order[0],votes:tally[order[0]],of:active,rounds,skipped:[...blocked]};
+    alive.delete(order[order.length-1]);
+  }
+  return {game:null,rounds,skipped:[...blocked]};
+}
+function myBlocks(){
+  const out=[],ns=nowSlot();
+  mySquads().forEach(q=>{for(let o=0;o<7;o++)blocks(q,o).forEach(b=>{if(b.members.includes("me")&&!(o===0&&b.b<=ns))out.push(b)})});
+  return out.sort((x,y)=>x.off-y.off||x.a-y.a);
+}
+/* times where I am part of a DubTime in more than one squad */
+function conflicts(){
+  const out=[],qs=mySquads();
+  for(let o=0;o<7;o++){const day=dayKey(o);let cur=null;
+    for(let s=0;s<=SLOTS;s++){
+      const hit=s<SLOTS?qs.filter(q=>{const m=slotMembers(q,day,s);return m.length>=2&&m.includes("me")}).map(q=>q.id):[];
+      const key=hit.length>=2?hit.join(","):"";
+      if(cur&&cur.key!==key){cur.b=s;out.push(cur);cur=null}
+      if(!cur&&key)cur={key,a:s,off:o,day,squads:hit};
+    }}
+  return out.filter(c=>!(c.off===0&&c.b<=nowSlot()));
+}
+const blockId=b=>[b.squad,b.day,b.a,b.b,b.key].join("|");
+
+/* ---------- pieces ---------- */
+function whenText(b){return dayLabel(b.off)+", "+range(b.a,b.b)}
+function blockCard(b,opts={}){
+  const q=squad(b.squad),g=pickGame(q,b.members),ns=nowSlot(),live=b.off===0&&b.a<=ns&&ns<b.b;
+  const names=b.members.map(m=>m==="me"?"You":person(m).name).join(", ");
+  const tier=b.tier==="full"?"Full-Squad DubTime":"DubTime";
+  const why=g.rounds.length?`<details class="why"><summary>How the game was picked</summary>${g.rounds.map((r,ri)=>`<div class="rnd">${g.rounds.length>1?`<span class="small" style="opacity:.8">${ri===0?"First choices":"After the least popular game dropped out"}</span>`:""}${r.map(x=>`<div class="row" style="gap:8px"><span class="row" style="gap:3px">${x.voters.map(v=>avatar(v).replace('class="av ','class="av xs ')).join("")}</span><span>${esc(x.game)}</span></div>`).join("")}</div>`).join("")}</details>`:"";
+  return `<div class="block ${b.tier}">
+    <div class="row"><span class="tier grow">${tier}</span>${live?'<span class="live">Live now</span>':""}</div>
+    <div class="when">${opts.day?esc(dayLabel(b.off))+" ":""}${range(b.a,b.b)}</div>
+    <div class="muted small">${opts.squad?esc(q.name)+" with ":""}${esc(names)} (${durLabel(b.b-b.a)})</div>
+    <div>${g.game?`Play <strong>${esc(g.game)}</strong> <span class="muted small">${g.votes} of ${g.of} top picks</span>`:'<span class="muted">No ranked game fits this head count yet</span>'}</div>
+    ${why}
+    ${opts.open?`<button class="btn sm ${b.tier==="full"?"":"ghost"}" data-a="openSquad" data-id="${q.id}" data-off="${b.off}" style="align-self:flex-start;${b.tier==="full"?"background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.5)":""}">Open ${esc(q.name)} schedule</button>`:""}
+  </div>`;
+}
+function gamesEditor(){
+  const list=S.rankDraft;
+  return `<div class="stack">
+    ${list.map((g,i)=>`<div class="panel row" style="padding:12px">
+      <span class="rank">${i+1}</span>
+      <div class="grow stack" style="gap:8px"><strong>${esc(g.name)}</strong>
+      <div class="row"><select class="gsel" id="need-${i}" data-change="need" data-i="${i}" aria-label="Players needed for ${esc(g.name)}">
+        <option value="2"${g.need==="2"?" selected":""}>2+ players</option><option value="3"${g.need==="3"?" selected":""}>3+ players</option><option value="full"${g.need==="full"?" selected":""}>Full squad only</option></select>
+      <button class="icon" data-a="gameUp" data-i="${i}" aria-label="Move ${esc(g.name)} up" ${i===0?"disabled":""}>↑</button>
+      <button class="icon" data-a="gameDown" data-i="${i}" aria-label="Move ${esc(g.name)} down" ${i===list.length-1?"disabled":""}>↓</button>
+      <button class="icon" data-a="gameDel" data-i="${i}" aria-label="Remove ${esc(g.name)}">✕</button></div></div></div>`).join("")}
+    ${list.length<5?`<select class="gsel" id="newGameSel" data-change="addGame" aria-label="Add a game" style="flex:none;width:100%;min-height:46px;font-size:16px"><option value="">Add a game</option>${GAME_IDEAS.filter(n=>!list.some(g=>g.name===n)).map(n=>`<option>${esc(n)}</option>`).join("")}<option value="__other">Something else…</option></select>
+    ${S.addOther?`<div class="row"><input type="text" id="newGame" placeholder="Game title" aria-label="Game title"><button class="btn" data-a="gameAdd">Add</button></div>`:""}`:`<p class="muted small">Five games is the limit. Remove one to add another.</p>`}
+    <p class="muted small">Rank 1 is your top pick. A game set to full squad only is skipped whenever someone is missing.</p>
+  </div>`;
+}
+
+/* ---------- screens ---------- */
+function inviteCards(){return S.invites.map(i=>{const q=squad(i.squad);return `<div class="panel row wrap" style="border-color:var(--full-hot)"><div class="grow"><strong>${esc(person(i.from).name)} invited you to ${esc(q.name)}</strong><div class="muted small">${q.members.length} members, from their squad invite link</div></div><button class="btn sm primary" data-a="acceptInvite" data-id="${q.id}">Join squad</button><button class="btn sm ghost" data-a="declineInvite" data-id="${q.id}">Decline</button></div>`}).join("")}
+function vIntro(){
+  const mm=[["Mike",2,8],["Jules",0,8],["Dev",4,11],["Rico",4,12]],R=12,on=(c,r)=>r>=mm[c][1]&&r<mm[c][2];
+  let g="";
+  mm.forEach((m,c)=>g+=`<div class="head" style="grid-row:1;grid-column:${c+1}"><span class="av ${c===0?"me":""}" aria-hidden="true">${m[0][0]}</span><span>${c===0?"You":m[0]}</span></div>`);
+  for(let r=0;r<R;r++){const k=mm.filter((m,c)=>on(c,r)).length,hr=r%2===0;
+    mm.forEach((m,c)=>{const o=on(c,r);g+=`<div class="c ${o?tierOf(k,4):""}${hr?" hr":""}${o&&!on(c,r-1)?" first":""}${o&&!on(c,r+1)?" last":""}" style="grid-row:${r+2};grid-column:${c+1}"></div>`})}
+  g+=`<div class="glow" style="grid-row:6/10;grid-column:1/-1"></div><div class="wtag" style="grid-row:6/10;grid-column:1/-1">FULL SQUAD</div>`;
+  const via=S.invites[0];
+  return `<div class="wordmark">Dubs<b>Day</b></div>
+  ${via?`<div class="panel" style="border-color:var(--full-hot)"><strong>${esc(person(via.from).name)} invited you to ${esc(squad(via.squad).name)}</strong><div class="muted small">Create your profile to join the squad.</div></div>`:""}
+  <div class="hero stack" style="gap:16px"><h1>Any day can be DubsDay.</h1>
+  <p class="muted">Everyone drops in the hours they can play. DubsDay finds where the squad overlaps, picks the game, and pings you when it is dub time.</p></div>
+  <div class="mini" role="img" aria-label="Example schedule: four squad members as columns, with a blue full squad band where all four overlap"><div class="sched" style="grid-template-columns:repeat(4,minmax(0,1fr))">${g}</div></div>
+  <div class="legend"><span><i class="dot solo"></i>No overlap</span><span><i class="dot dub"></i>DubTime</span><span><i class="dot full"></i>Full-Squad DubTime</span></div>
+  <ol class="steps"><li><span>Create your profile with a first name and gamertag.</span></li><li><span>Add friends, join a squad by invite or code, and rank your games for that squad.</span></li><li><span>Set when you are free. The schedule and the alerts handle the rest.</span></li></ol>
+  <div class="stack"><button class="btn signin block" data-a="toSignin">Sign in</button><button class="btn google block" data-a="google">Continue with Google</button><button class="btn create block" data-a="toStart">Create an account</button>
+  <p class="muted small">Prototype with sample data. Google sign-in is simulated and nothing leaves this browser.</p>
+  ${via?"":`<button class="btn sm ghost" data-a="simInvite" style="align-self:flex-start">Prototype: arrive from Jules's squad invite link</button>`}</div>`;
+}
+function vStart(){
+  return `<div class="wordmark">Dubs<b>Day</b></div><div class="stack" style="gap:6px"><h2>Create an account</h2><p class="muted">Choose how you want to sign in from now on. Either way, you set your first name and gamertag next.</p></div>
+  <button class="btn google block" data-a="google">Continue with Google</button><button class="btn create block" data-a="emailStart">Create an account with email</button>
+  <p class="muted small">Already have an account?</p><button class="btn signin block" data-a="toSignin">Sign in</button><button class="btn ghost block" data-a="toIntro">Back</button>`;
+}
+function vSignin(){
+  return `<div class="wordmark">Dubs<b>Day</b></div><div class="stack" style="gap:6px"><h2>Sign in</h2><p class="muted">Sign-in is simulated here. Google, or any email and password, opens a returning account that is already in The Dub Club.</p></div>
+  <button class="btn google block" data-a="signinDone">Continue with Google</button>
+  <div class="field"><label for="siEmail">Email</label><input type="text" id="siEmail" inputmode="email" autocapitalize="off" autocomplete="username" placeholder="you@example.com" value="${esc(S.draftEmail||"")}"></div>
+  <div class="field"><label for="siPass">Password</label><input type="password" id="siPass" autocomplete="current-password"></div>
+  ${formErr?`<p class="err">${esc(formErr)}</p>`:""}
+  <button class="btn signin block" data-a="signinEmail">Sign in</button>
+  <p class="muted small">New to DubsDay?</p><button class="btn create block" data-a="toStart">Create an account</button><button class="btn ghost block" data-a="toIntro">Back</button>`;
+}
+const stepNote=n=>`<p class="muted small">Step ${n} of 3</p>`;
+function vSignup(){
+  return `<div class="wordmark">Dubs<b>Day</b></div><div class="stack" style="gap:6px">${stepNote(1)}<h2>Create your profile</h2>${S.viaGoogle?'<p class="muted">Signed in with Google. Add the details your squad will see.</p>':""}</div>
+  ${S.viaGoogle?"":`<div class="field"><label for="suEmail">Email</label><input type="text" id="suEmail" inputmode="email" autocapitalize="off" placeholder="you@example.com" value="${esc(S.draftEmail||"")}"></div>
+  <div class="field"><label for="suPass">Password</label><input type="password" id="suPass" autocomplete="new-password"><span class="muted small">At least 8 characters. Nothing typed here is saved in this prototype.</span></div>`}
+  <div class="field"><label for="suName">First name</label><input type="text" id="suName" value="${esc(S.draftName||"Mike")}" maxlength="20"><span class="muted small">This is how you appear in your squads' schedules. Add a last initial if you need one, like Mike M.</span></div>
+  <div class="field"><label for="suUser">Gamertag</label><input type="text" id="suUser" value="${esc(S.draftUser||"mike")}" maxlength="20" autocapitalize="off"><span class="muted small">Friends search for you by gamertag. Squads are never searchable.</span></div>
+  ${formErr?`<p class="err">${esc(formErr)}</p>`:""}
+  <button class="btn primary block" data-a="signup">Create profile</button><button class="btn ghost block" data-a="toStart">Back</button>`;
+}
+function vRank(){
+  const q=squad(S.rankFor),many=mySquads().length>1;
+  return `<div class="stack" style="gap:6px"><p class="muted small">${esc(q.name)}</p><h1 style="font-size:28px">Rank your games for this squad</h1><p class="muted">Up to five. Everyone's rankings in ${esc(q.name)} decide what gets played each DubTime.</p></div>
+  ${gamesEditor()}
+  <div class="panel row"><div class="grow"><strong>Apply to all my squads</strong><div class="muted small">${many?"Copies these rankings to every squad you are in.":"Also used as the starting point for squads you join later."}</div></div><button class="toggle" role="switch" aria-checked="${!!S.applyAll}" aria-label="Apply to all my squads" data-a="applyAll"></button></div>
+  <div class="stack"><button class="btn primary block" data-a="saveRank">Save rankings</button><button class="btn ghost block" data-a="skipRank">${S.rankThenAvail?"Skip for now":"Cancel"}</button>
+  ${S.rankThenAvail?`<p class="muted small">Next you set when you can dub.</p>`:""}</div>`;
+}
+function vOnFriends(){
+  const n=S.reqOut.length;
+  return `<div class="wordmark">Dubs<b>Day</b></div><div class="stack" style="gap:6px">${stepNote(2)}<h2>Find your friends</h2><p class="muted">Search by gamertag, or send a link to friends who are not on DubsDay yet.</p></div>
+  <div class="panel stack"><div class="field"><label for="fq">Search by gamertag</label><input type="text" id="fq" placeholder="Try julesgotdubs or ricochet" autocapitalize="off"></div><div id="fres" class="stack"></div>
+    ${n?`<p class="small">${n} friend ${n===1?"request":"requests"} ready: ${S.reqOut.map(id=>"@"+esc(person(id).u)).join(", ")}</p><p class="muted small">First names stay hidden until a request is accepted.</p>`:""}</div>
+  <div class="panel stack"><h3>Invite friends to DubsDay</h3>
+    ${S.inviteLink?`<div class="row wrap"><span class="grow" style="word-break:break-all">${esc(S.inviteLink)}</span><button class="btn sm" data-a="copy" data-t="${esc(S.inviteLink)}">Copy link</button></div><p class="muted small">Example link for this prototype. Anyone who opens the real one creates a profile and lands in your friends list.</p>`:`<button class="btn" data-a="mkLink">Create invite link</button>`}</div>
+  <div class="stack"><button class="btn primary block" data-a="friendsNext" ${n||S.inviteLink?"":"disabled"}>Continue</button><button class="btn ghost block" data-a="friendsSkip">Skip for now</button></div>`;
+}
+function vOnSquad(){
+  return `<div class="wordmark">Dubs<b>Day</b></div><div class="stack" style="gap:6px">${stepNote(3)}<h2>Create or join a squad</h2><p class="muted">A squad is the group whose schedules get lined up. You can skip this, but DubsDay works best with one. After joining, you rank your games for that squad.</p></div>
+  ${inviteCards()}
+  <div class="panel stack"><h3>Join with a squad code</h3><div class="row"><input type="text" id="joinCode" placeholder="Squad code" autocapitalize="characters" aria-label="Squad code"><button class="btn" data-a="join">Join</button></div>${formErr?`<p class="err">${esc(formErr)}</p>`:""}<p class="muted small">Squads are invite only. In this prototype, try DUBTIME or LATESHIFT.</p></div>
+  <div class="panel stack"><h3>Start a squad</h3><div class="row"><input type="text" id="newSquad" placeholder="Squad name" maxlength="24" aria-label="Squad name"><button class="btn" data-a="createSquad">Create</button></div></div>
+  <button class="btn ghost block" data-a="squadSkip">Skip for now</button>`;
+}
+function vHome(){
+  const mb=myBlocks(),cf=conflicts(),today=mb.find(b=>b.off===0),next=mb[0];
+  const inv=inviteCards();
+  const cfh=cf.map((c,i)=>`<div class="panel stack"><div><h3>Pick your squad</h3><p class="muted small">${esc(dayLabel(c.off))}, ${range(c.a,c.b)}. More than one squad lines up with you. Choosing one clears this time from the others.</p></div>
+    ${c.squads.map(id=>{const q=squad(id),m=slotMembers(q,c.day,c.a),t=tierOf(m.length,q.members.length),g=pickGame(q,m);return `<button class="btn row" style="text-align:left;justify-content:space-between" data-a="commit" data-i="${i}" data-id="${id}"><span><i class="dot ${t}"></i> <strong>${esc(q.name)}</strong><br><span class="muted small">${t==="full"?"Full squad":m.length+" of "+q.members.length} ${g.game?"playing "+esc(g.game):""}</span></span><span>Choose</span></button>`}).join("")}</div>`).join("");
+  let hero;const qs=mySquads(),need=qs.length&&!hasUpcomingAvail();
+  if(need)hero=`<div class="panel stack" style="border-color:var(--cta)"><h2>Set your dub availability</h2><p class="muted">Tell ${esc(qs.map(q=>q.name).join(" and "))} when you can play. You choose which squads see each time.</p><button class="btn cta" data-a="openSheet">Set dub availability</button></div>`;
+  else if(next){const ms=slotTime(next.off,next.a)-Date.now();const h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000);
+    hero=`<div class="stack"><p class="muted">${ms>0?`Next up in ${h>=24?Math.floor(h/24)+"d "+(h%24)+"h":h+"h "+m+"m"}`:"Happening now"}</p>${blockCard(next,{day:true,squad:true,open:true})}</div>`}
+  else hero=`<div class="panel stack"><p>${qs.length?"Your time is in. Nothing overlaps with your squad yet, and you will get a notification when it does.":"Join a squad to see when everyone can play."}</p>${qs.length?"":`<button class="btn primary" data-a="tab" data-id="squads">Create or join a squad</button>`}</div>`;
+  const rest=mb.slice(1,6);
+  return `<div class="row"><div class="grow"><p class="muted small">${esc(dubBase(0).toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}))}</p><h1>${today?"It's DubsDay, "+esc(S.me.name)+".":"Who's ready for dubs?"}</h1></div></div>
+  ${inv}${cfh}${hero}
+  ${(need?mb:rest).length?`<div class="stack"><h3>Coming up</h3>${(need?mb.slice(0,5):rest).map(b=>blockCard(b,{day:true,squad:true,open:true})).join("")}</div>`:""}
+  ${!need&&qs.length?`<button class="btn cta block" data-a="openSheet">Set dub availability</button>`:""}
+  ${installed()||S.a2hsHide?"":`<div class="panel stack"><div class="row"><span class="appicon">W</span><div class="grow"><strong>Add DubsDay to your Home Screen</strong><div class="muted small">It opens like an app, and on iPhone it is what lets DubsDay send you notifications.</div></div></div>
+    <ol class="steps"><li><span>Open DubsDay in Safari and tap the Share button.</span></li><li><span>Choose Add to Home Screen.</span></li><li><span>Open DubsDay from the new icon and allow notifications.</span></li></ol>
+    <button class="btn sm ghost" data-a="a2hsHide" style="align-self:flex-start">Not now</button></div>`}`;
+}
+function vSquads(){
+  const qs=mySquads();
+  return `<h1>Squads</h1>
+  ${qs.length?qs.map(q=>{const b=blocks(q,0).concat(blocks(q,1)).find(x=>!(x.off===0&&x.b<=nowSlot()));return `<button class="panel row" style="text-align:left;width:100%" data-a="openSquad" data-id="${q.id}" data-off="0"><span class="grow"><strong>${esc(q.name)}</strong><br><span class="muted small">${q.members.map(m=>m==="me"?"You":person(m).name).join(", ")}</span>${b?`<br><span class="small"><i class="dot ${b.tier}"></i> ${esc(whenText(b))}</span>`:""}</span><span aria-hidden="true">›</span></button>`}).join(""):`<p class="muted">You are not in a squad yet. Accept an invite, enter a code, or start one.</p>`}
+  <div class="panel stack"><h3>Join with a squad code</h3><div class="row"><input type="text" id="joinCode" placeholder="Squad code" autocapitalize="characters" aria-label="Squad code"><button class="btn" data-a="join">Join</button></div>${formErr?`<p class="err">${esc(formErr)}</p>`:""}<p class="muted small">Squads never show up in search. Try DUBTIME or LATESHIFT here.</p></div>
+  <div class="panel stack"><h3>Start a squad</h3><div class="row"><input type="text" id="newSquad" placeholder="Squad name" maxlength="24" aria-label="Squad name"><button class="btn" data-a="createSquad">Create</button></div></div>`;
+}
+function vSquad(){
+  const q=squad(S.squadId),off=S.dayOff,day=dayKey(off),n=q.members.length,ns=off===0?nowSlot():-1;
+  const order=["me",...q.members.filter(m=>m!=="me")].filter(m=>q.members.includes(m));
+  const bl=blocks(q,off);
+  let first=clamp(ns-2,0,SLOTS-1);
+  if(off!==0){let e=SLOTS;order.forEach(m=>{for(let x=0;x<e;x++)if(isAvail(m,q.id,day,x)){e=x;break}});if(e===SLOTS)e=sl(12)+2;first=Math.max(0,e-2)}
+  const top=first;
+  const cols=`46px repeat(${n},minmax(0,1fr))`;let h="";
+  order.forEach((m,i)=>h+=`<div class="head" style="grid-row:1;grid-column:${i+2}">${avatar(m)}<span>${m==="me"?"You":esc(person(m).name)}</span></div>`);
+  h+=`<div class="head" style="grid-row:1;grid-column:1"></div>`;
+  let r=2;const rowOf={};
+  for(let s=first;s<SLOTS;s++){
+    if(s===ns){h+=`<div class="now" style="grid-row:${r};grid-column:1/-1"></div>`;r++}
+    rowOf[s]=r;const past=ns>s?" past":"",hr=s%2===0;
+    h+=`<div class="t${past}" style="grid-row:${r};grid-column:1">${hr&&s!==ns?tl(s).replace(":00",""):""}</div>`;
+    const k=slotMembers(q,day,s).length;
+    order.forEach((m,i)=>{const on=isAvail(m,q.id,day,s),t=on?tierOf(k,n):"";
+      const prev=s>first&&isAvail(m,q.id,day,s-1),nxt=s<SLOTS-1&&isAvail(m,q.id,day,s+1);
+      h+=`<div class="c ${t}${hr?" hr":""}${on&&!prev?" first":""}${on&&!nxt?" last":""}${m==="me"?" mine":""}${past}" style="grid-row:${r};grid-column:${i+2}" ${m==="me"?'data-a="openSheet"':""}></div>`});
+    r++;
+  }
+  bl.filter(b=>b.tier==="full").forEach(b=>{const a=rowOf[Math.max(b.a,first)],e=rowOf[b.b-1]+1;
+    h+=`<div class="glow" style="grid-row:${a}/${e};grid-column:2/-1"></div><div class="wtag" style="grid-row:${a}/${e};grid-column:2/-1">${b.b-b.a>=2?"FULL SQUAD":"W"}</div>`});
+  const nonFriends=S.friends.filter(f=>!q.members.includes(f)),mineG=S.myGames[q.id]||[];
+  return `<div class="row"><button class="btn sm ghost" data-a="backSquads">‹ Squads</button></div>
+  <h1>${esc(q.name)}</h1>
+  ${mineG.length?"":`<div class="panel stack" style="border-color:var(--full-hot)"><div><strong>Rank your games for this squad</strong><p class="muted small">Your picks count toward what ${esc(q.name)} plays each DubTime.</p></div><button class="btn primary" data-a="rank" data-id="${q.id}">Rank your game preferences</button></div>`}
+  <div class="chips" role="tablist">${[0,1,2,3,4,5,6].map(o=>`<button class="chip ${o===off?"on":""}" data-a="day" data-off="${o}">${esc(dayLabel(o))}</button>`).join("")}</div>
+  <button class="btn cta block" data-a="openSheet">Set dub availability</button>
+  ${bl.length?`<div class="stack">${bl.map(b=>blockCard(b)).join("")}</div>`:`<p class="muted">No overlap on this dub day yet.</p>`}
+  <div class="legend"><span><i class="dot solo"></i>No overlap</span><span><i class="dot dub"></i>DubTime</span><span><i class="dot full"></i>Full-Squad DubTime</span></div>
+  <div class="schedwrap" data-k="${q.id}|${off}" data-top="${top-first}"><div class="sched" style="grid-template-columns:${cols}">${h}</div></div>
+  <p class="muted small">${off===0?"Starts an hour before now and runs":"Runs"} to the end of the dub day at 4:00am.</p>
+  ${mineG.length?`<div class="panel stack"><div class="row"><h3 class="grow">Your game rankings here</h3><button class="btn sm" data-a="rank" data-id="${q.id}">Edit</button></div>${mineG.map((g,i)=>`<div class="row"><span class="rank">${i+1}</span><span class="grow">${esc(g.name)}</span><span class="muted small">${g.need==="full"?"Full squad only":g.need+"+ players"}</span></div>`).join("")}</div>`:""}
+  <div class="panel stack"><h3>Members</h3>
+    ${order.map(m=>`<div class="row">${avatar(m)}<div class="grow"><strong>${m==="me"?"You":esc(person(m).name)}</strong><div class="muted small">@${esc(person(m).u)}</div></div></div>`).join("")}
+    <div class="row wrap"><span class="grow">Squad code <strong>${esc(q.code)}</strong></span><button class="btn sm" data-a="copy" data-t="${esc(q.code)}">Copy code</button></div>
+    ${S.sqLinks&&S.sqLinks[q.id]?`<div class="row wrap"><span class="grow" style="word-break:break-all">${esc(S.sqLinks[q.id])}</span><button class="btn sm" data-a="copy" data-t="${esc(S.sqLinks[q.id])}">Copy link</button></div><p class="muted small">Example link. Whoever opens the real one is asked to join this squad when they sign up.</p>`:`<button class="btn sm" data-a="sqLink" style="align-self:flex-start">Create squad invite link</button>`}
+    ${nonFriends.length?`<div class="stack"><p class="muted small">Invite a friend</p>${nonFriends.map(f=>`<div class="row">${avatar(f)}<span class="grow">${esc(person(f).name)}</span><button class="btn sm" data-a="inviteFriend" data-id="${f}">Invite</button></div>`).join("")}</div>`:""}
+    <button class="btn sm ghost" data-a="leave" style="align-self:flex-start;color:var(--danger)">Leave squad</button></div>`;
+}
+const tagAv=id=>`<span class="av" aria-hidden="true">${esc(USERS[id].u[0].toUpperCase())}</span>`;
+function friendResults(qv){
+  qv=qv.trim().toLowerCase().replace(/^@/,"");if(!qv)return "";
+  const hits=Object.keys(USERS).filter(id=>USERS[id].u.includes(qv));
+  if(!hits.length)return `<p class="muted small">Nobody found with that gamertag.</p>`;
+  return hits.map(id=>`<div class="row">${tagAv(id)}<strong class="grow">@${esc(USERS[id].u)}</strong>${S.friends.includes(id)?'<span class="muted small">Friends</span>':S.reqOut.includes(id)?'<span class="muted small">Request sent</span>':`<button class="btn sm" data-a="addFriend" data-id="${id}">Add friend</button>`}</div>`).join("");
+}
+function vFriends(){
+  return `<h1>Friends</h1>
+  <div class="panel stack"><div class="field"><label for="fq">Find people by gamertag</label><input type="text" id="fq" placeholder="Try pixelpriya or samwise_gg" autocapitalize="off"></div><div id="fres" class="stack"></div></div>
+  ${S.reqIn.length?`<div class="stack"><h3>Requests</h3>${S.reqIn.map(id=>`<div class="panel row">${tagAv(id)}<div class="grow"><strong>@${esc(person(id).u)}</strong><div class="muted small">Wants to be friends</div></div><button class="btn sm primary" data-a="acceptFriend" data-id="${id}">Accept</button></div>`).join("")}</div>`:""}
+  <div class="stack"><h3>Your friends</h3>${S.friends.length?S.friends.map(id=>`<div class="panel row">${avatar(id)}<div class="grow"><strong>${esc(person(id).name)}</strong><div class="muted small">@${esc(person(id).u)}${(S.games[id]||[]).length?" plays "+esc(S.games[id][0].name):""}</div></div></div>`).join(""):`<p class="muted">No friends yet. Search by gamertag above.</p>`}
+  ${S.reqOut.map(id=>`<div class="panel row">${tagAv(id)}<div class="grow"><strong>@${esc(person(id).u)}</strong></div><span class="muted small">Request sent</span></div>`).join("")}</div>`;
+}
+function vProfile(){
+  const t=(k,l,d)=>`<div class="row"><div class="grow"><strong>${l}</strong><div class="muted small">${d}</div></div><button class="toggle" role="switch" aria-checked="${S.notif[k]}" aria-label="${l}" data-a="notif" data-k="${k}"></button></div>`;
+  return `<div class="row">${avatar("me")}<div class="grow"><h2>${esc(S.me.name)}</h2><span class="muted">@${esc(S.me.username)}</span></div></div>
+  <div class="panel stack"><h3>Change gamertag</h3><div class="row"><input type="text" id="pfTag" value="${esc(S.me.username)}" maxlength="20" autocapitalize="off" aria-label="Gamertag"><button class="btn" data-a="saveTag">Save</button></div>
+    ${formErr&&errAt==="tag"?`<p class="err">${esc(formErr)}</p>`:""}<p class="muted small">Friends search for you by gamertag. Your squads and friends stay the same when you change it.</p></div>
+  <div class="panel stack"><h3>Change password</h3>${S.me.google?`<p class="muted small">You sign in with Google, so this account has no DubsDay password.</p>`:`<div class="field"><label for="pfCur">Current password</label><input type="password" id="pfCur" autocomplete="current-password"></div>
+    <div class="field"><label for="pfNew">New password</label><input type="password" id="pfNew" autocomplete="new-password"><span class="muted small">At least 8 characters.</span></div>
+    ${formErr&&errAt==="pw"?`<p class="err">${esc(formErr)}</p>`:""}<button class="btn" data-a="savePw">Change password</button>`}</div>
+  <div class="panel stack"><h3>Game rankings by squad</h3>${mySquads().length?mySquads().map(q=>{const n=(S.myGames[q.id]||[]).length;return `<div class="row"><div class="grow"><strong>${esc(q.name)}</strong><div class="muted small">${n?n+(n===1?" game ranked":" games ranked"):"Not ranked yet"}</div></div><button class="btn sm" data-a="rank" data-id="${q.id}">${n?"Edit":"Rank games"}</button></div>`}).join(""):`<p class="muted small">Join a squad to rank games for it.</p>`}</div>
+  <div class="panel stack"><h3>Notifications</h3>
+    ${t("found","DubTime found","The moment an overlap exists")}${t("warn","15-minute warning","Before each DubTime starts")}${t("live","Live on your lock screen","Stays up with time remaining until DubTime ends")}
+    <button class="btn" data-a="lock">Preview on a lock screen</button>
+    <p class="note">On iPhone, web notifications work once DubsDay is added to the Home Screen. The always-on lock screen countdown needs the iPhone app, planned as the next phase.</p></div>
+  <button class="btn ghost" data-a="reset">Reset the prototype</button>`;
+}
+function vLock(){
+  const b=myBlocks()[0],q=b?squad(b.squad):S.squads[0];
+  const a=b?b.a:sl(21),e=b?b.b:sl(23),full=b?b.tier==="full":true,g=b?pickGame(q,b.members).game:"Gears of War: E-Day";
+  const title=full?"Full-Squad DubTime":"DubTime",d=new Date();
+  return `<div class="lock"><div class="in">
+    <div class="clock">${tl(a).replace(/[ap]m/,"")}</div><div class="date">${esc(d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}))}</div>
+    <div class="la"><div class="row"><span class="appicon">W</span><div class="grow"><strong>${title} is live</strong><div class="muted small">${esc(q.name)}${g?", "+esc(g):""}</div></div></div>
+      <div class="row" style="align-items:flex-end"><div class="grow"><div class="muted small">Time remaining</div><div class="rem">${durLabel(e-a)||"0m"}</div></div><div class="muted small" style="text-align:right">${range(a,e)}</div></div>
+      <div class="bar"><i style="width:6%"></i></div></div>
+    <p class="muted small" style="text-align:center">Stays on the lock screen until DubTime ends (iPhone app phase)</p>
+    <div class="push" style="animation:none"><span class="appicon">W</span><div><b>${title} in 15 minutes</b><span>${esc(q.name)} starts at ${tl(a)}. ${g?"Tonight's pick: "+esc(g)+".":""}</span></div></div>
+    <div class="push" style="animation:none"><span class="appicon">W</span><div><b>${title} found</b><span>${esc(q.name)}: everyone${full?"":" available"} overlaps ${range(a,e)}.</span></div></div>
+    <button class="btn block" data-a="unlock" style="margin-top:14px">Close preview</button></div></div>`;
+}
+const REP={none:"Just this day",daily:"Every day",weekly:""};
+function vSheet(){
+  const qs=mySquads(),day=dayKey(sheet.off),mine=S.avail.me.map((w,i)=>({w,i})).filter(x=>winOn(x.w,day)).sort((x,y)=>x.w.a-y.w.a);
+  const wd=dubBase(sheet.off).toLocaleDateString(undefined,{weekday:"long"});
+  return `<div class="scrim" data-a="closeSheet"><div class="sheet" role="dialog" aria-label="Set dub availability" data-stop>
+    <div class="row"><h2 class="grow">When can you dub?</h2><button class="btn sm ghost" data-a="closeSheet">Close</button></div>
+    <div class="chips">${[0,1,2,3,4,5,6].map(o=>`<button class="chip ${o===sheet.off?"on":""}" data-a="sheetDay" data-off="${o}">${esc(dayLabel(o))}</button>`).join("")}</div>
+    ${mine.length?`<div class="stack" style="gap:8px"><p class="muted small">Already set for this day</p>${mine.map(x=>`<div class="row"><i class="dot solo"></i><span class="grow">${range(x.w.a,x.w.b)} <span class="muted small">${x.w.squads==="all"?"all squads":x.w.squads.map(id=>esc(squad(id)?squad(id).name:"")).join(", ")}${x.w.repeat==="daily"?", repeats daily":x.w.repeat==="weekly"?", repeats weekly":""}</span></span><button class="btn sm ghost" data-a="delWin" data-i="${x.i}">${x.w.repeat&&x.w.repeat!=="none"?"Remove all":"Remove"}</button></div>`).join("")}</div>`:""}
+    <div><p class="muted small">Drag either end to change when you start or stop. Drag the yellow band to move the whole time.</p>
+    <div class="dialwrap"><svg id="dial" viewBox="0 0 300 300" aria-label="Availability clock">
+      <circle cx="150" cy="150" r="112" fill="none" stroke="var(--line)" stroke-width="26"/>
+      ${Array.from({length:12},(_,i)=>{const a=i*30*Math.PI/180,x1=150+Math.sin(a)*86,y1=150-Math.cos(a)*86,x2=150+Math.sin(a)*(i%3?92:95),y2=150-Math.cos(a)*(i%3?92:95);return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--muted)" stroke-width="${i%3?1:2}"/>`}).join("")}
+      ${[[12,150,80],[3,224,155],[6,150,230],[9,76,155]].map(([n,x,y])=>`<text x="${x}" y="${y}" text-anchor="middle">${n}</text>`).join("")}
+      <path id="arc1" fill="none" stroke="var(--solo)" stroke-width="26" stroke-linecap="round" style="cursor:grab"/>
+      <path id="arc2" fill="none" stroke="#fff3c4" stroke-width="12" stroke-linecap="round"/>
+      <circle id="knobS" r="16" fill="var(--ink)" stroke="var(--solo)" stroke-width="5" tabindex="0" role="slider" aria-label="Start time"/>
+      <circle id="knobE" r="17" fill="var(--text)" stroke="var(--ink)" stroke-width="4" tabindex="0" role="slider" aria-label="End time"/>
+      <text class="big" id="dialStart" x="150" y="140" text-anchor="middle" style="font-size:25px"></text>
+      <text class="big" id="dialEnd" x="150" y="170" text-anchor="middle" style="font-size:25px"></text>
+      <text class="mid" id="dialDur" x="150" y="194" text-anchor="middle"></text>
+    </svg></div>
+    <div class="row" style="justify-content:center"><button class="btn sm" data-a="untilTwo">Stretch to 4:00am</button></div></div>
+    <div class="stack" style="gap:8px"><p class="muted small">Repeat</p><div class="row wrap">${["none","daily","weekly"].map(r=>`<button class="chip ${sheet.repeat===r?"on":""}" data-a="rep" data-r="${r}">${r==="weekly"?"Every "+esc(wd):REP[r]}</button>`).join("")}</div></div>
+    <div class="stack" style="gap:8px"><p class="muted small">Share with</p><div class="row wrap"><button class="chip ${sheet.squads==="all"?"on":""}" data-a="sqAll">All squads</button>${qs.map(q=>`<button class="chip ${sheet.squads!=="all"&&sheet.squads.includes(q.id)?"on":""}" data-a="sqTog" data-id="${q.id}">${esc(q.name)}</button>`).join("")}</div></div>
+    <button class="btn cta block" id="saveBtn" data-a="saveWin"></button>
+  </div></div>`;
+}
+
+/* ---------- dial: 12-hour face, both ends and the band are draggable ---------- */
+function pt(deg,r){const a=deg*Math.PI/180;return [150+Math.sin(a)*r,150-Math.cos(a)*r]}
+function arcPath(a0,sweep,r){if(sweep<=0)return "";if(sweep>=359.9){const [x1,y1]=pt(a0,r),[x2,y2]=pt(a0+180,r);return `M${x1} ${y1}A${r} ${r} 0 1 1 ${x2} ${y2}A${r} ${r} 0 1 1 ${x1} ${y1}`}
+  const [x1,y1]=pt(a0,r),[x2,y2]=pt(a0+sweep,r);return `M${x1} ${y1}A${r} ${r} 0 ${sweep>180?1:0} 1 ${x2} ${y2}`}
+const startAngle=()=>((240+sheet.start*30)%720)/2;
+const minStart=()=>sheet.off===0?Math.max(0,Math.min(nowSlot(),SLOTS-1)):0;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function updateDial(){
+  const d=document.getElementById("dial");if(!d)return;const a0=startAngle(),sw=sheet.dur*15,end=sheet.start+sheet.dur;
+  document.getElementById("arc1").setAttribute("d",arcPath(a0,Math.min(sw,360),112));
+  document.getElementById("arc2").setAttribute("d",arcPath(a0,Math.max(0,sw-360),112));
+  const [sx,sy]=pt(a0,112),[kx,ky]=pt(a0+sw,112);
+  const ks=document.getElementById("knobS");ks.setAttribute("cx",sx);ks.setAttribute("cy",sy);ks.setAttribute("aria-valuetext",tl(sheet.start));
+  const ke=document.getElementById("knobE");ke.setAttribute("cx",kx);ke.setAttribute("cy",ky);ke.setAttribute("aria-valuetext",tl(end));
+  document.getElementById("dialStart").textContent=tl(sheet.start);document.getElementById("dialEnd").textContent="to "+tl(end);
+  document.getElementById("dialDur").textContent=durLabel(sheet.dur);
+  const rp=sheet.repeat==="daily"?", every day":sheet.repeat==="weekly"?", weekly":"";
+  document.getElementById("saveBtn").textContent="Save "+range(sheet.start,end)+rp;
+}
+function nudge(mode,n,base){
+  base=base||{start:sheet.start,dur:sheet.dur};const end=base.start+base.dur;
+  if(mode==="end")sheet.dur=clamp(end+n,base.start+1,SLOTS)-base.start;
+  else if(mode==="start"){const ns=clamp(base.start+n,Math.min(minStart(),end-1),end-1);sheet.start=ns;sheet.dur=end-ns}
+  else sheet.start=clamp(base.start+n,Math.min(minStart(),SLOTS-base.dur),SLOTS-base.dur);
+  updateDial();
+}
+function bindDial(){
+  const d=document.getElementById("dial");if(!d)return;updateDial();let mode=null,last=0,acc=0,base=null;
+  const pos=e=>{const r=d.getBoundingClientRect(),k=300/r.width,x=(e.clientX-r.left)*k,y=(e.clientY-r.top)*k;return {x,y,rad:Math.hypot(x-150,y-150),ang:(Math.atan2(x-150,150-y)*180/Math.PI+360)%360}};
+  d.addEventListener("pointerdown",e=>{const p=pos(e),a0=startAngle(),sw=sheet.dur*15,[sx,sy]=pt(a0,112),[ex,ey]=pt(a0+sw,112);
+    const dS=Math.hypot(p.x-sx,p.y-sy),dE=Math.hypot(p.x-ex,p.y-ey);
+    if(dE<=28&&dE<=dS)mode="end";else if(dS<=28)mode="start";
+    else if(p.rad>90&&p.rad<134&&(sw>=360||((p.ang-a0)%360+360)%360<=sw))mode="move";else return;
+    e.preventDefault();try{d.setPointerCapture(e.pointerId)}catch(x){}
+    last=p.ang;acc=0;base={start:sheet.start,dur:sheet.dur};d.style.cursor="grabbing"});
+  d.addEventListener("pointermove",e=>{if(!mode)return;const a=pos(e).ang;acc+=((a-last+540)%360)-180;last=a;nudge(mode,Math.round(acc/15),base)});
+  const stop=()=>{mode=null;d.style.cursor=""};d.addEventListener("pointerup",stop);d.addEventListener("pointercancel",stop);
+  d.addEventListener("keydown",e=>{const m=e.target.id==="knobS"?"start":e.target.id==="knobE"?"end":null;if(!m)return;
+    const n=e.key==="ArrowRight"||e.key==="ArrowUp"?1:e.key==="ArrowLeft"||e.key==="ArrowDown"?-1:0;if(n){e.preventDefault();nudge(m,n)}});
+}
+
+/* ---------- render ---------- */
+function render(){
+  const app=document.getElementById("app"),sh=document.querySelector(".sheet"),st=sh?sh.scrollTop:0;let h;
+  const ow=document.querySelector(".schedwrap"),ok=ow?ow.dataset.k:"",ot=ow?ow.scrollTop:0;
+  if(S.step==="intro")h=vIntro();else if(S.step==="start")h=vStart();else if(S.step==="signin")h=vSignin();else if(S.step==="signup")h=vSignup();else if(S.step==="friends")h=vOnFriends();else if(S.step==="squad")h=vOnSquad();
+  else{
+    h=S.rankFor&&squad(S.rankFor)?vRank():S.squadId&&S.tab==="squads"?vSquad():S.tab==="home"?vHome():S.tab==="squads"?vSquads():S.tab==="friends"?vFriends():vProfile();
+    const tb=(id,l)=>`<button class="${S.tab===id?"on":""}" data-a="tab" data-id="${id}" ${S.tab===id?'aria-current="page"':""}>${l}</button>`;
+    h+=`<nav class="tabs" aria-label="Main">${tb("home","Home")}${tb("squads","Squads")}<button class="plus" data-a="openSheet" aria-label="Set dub availability">+</button>${tb("friends","Friends")}${tb("profile","Profile")}</nav>`;
+    if(sheet)h+=vSheet();if(lockOpen)h+=vLock();
+  }
+  app.innerHTML=h;persist();
+  const nw=document.querySelector(".schedwrap");if(nw)nw.scrollTop=nw.dataset.k===ok?ot:+nw.dataset.top*26;
+  if(S.step==="friends"&&S.keepQ){const f=document.getElementById("fq");f.value=S.keepQ;document.getElementById("fres").innerHTML=friendResults(S.keepQ);S.keepQ=""}
+  if(sheet){bindDial();const n=document.querySelector(".sheet");if(n)n.scrollTop=st}
+}
+function push(title,body,full,act){
+  const el=document.createElement("button");el.className="push"+(full?" full":"");
+  el.innerHTML=`<span class="appicon">W</span><div><b>${esc(title)}</b><span>${esc(body)}</span></div>`;
+  el.onclick=()=>{el.remove();if(act)act()};document.getElementById("toasts").appendChild(el);setTimeout(()=>el.remove(),8000);
+}
+function withAlerts(fn){
+  const before=new Set(myBlocks().map(blockId));fn();
+  if(!S.notif.found)return;
+  const fresh=myBlocks().filter(b=>!before.has(blockId(b))).sort((x,y)=>(y.tier==="full")-(x.tier==="full"));
+  fresh.slice(0,2).forEach(b=>{const q=squad(b.squad),g=pickGame(q,b.members).game;
+    push((b.tier==="full"?"Full-Squad DubTime":"DubTime")+" found",`${q.name}: ${whenText(b)}.${g?" Pick: "+g+".":""}`,b.tier==="full",()=>{S.tab="squads";S.squadId=q.id;S.dayOff=b.off;sheet=null;render()})});
+}
+function openSheet(){
+  if(!mySquads().length){push("Join a squad first","Accept an invite on Home or enter a squad code.",false);return}
+  const off=S.squadId&&S.tab==="squads"?S.dayOff:0;
+  const start=clamp(Math.round((Date.now()-dubBase(0).getTime())/(30*MIN)),0,SLOTS-1);
+  sheet={off,start,dur:Math.min(6,SLOTS-start),squads:"all",repeat:"none"};
+}
+const A={
+  google(){S.viaGoogle=true;S.step="signup"},
+  toStart(){S.step="start"},toSignin(){S.step="signin"},emailStart(){S.viaGoogle=false;S.step="signup"},
+  signinEmail(){const e=document.getElementById("siEmail").value.trim(),pw=document.getElementById("siPass").value;S.draftEmail=e;
+    if(!/^\S+@\S+\.\S+$/.test(e)){formErr="Enter the email you signed up with.";return}
+    if(!pw){formErr="Enter your password.";return}
+    A.signinDone();S.me.google=false},
+  saveTag(){const u=document.getElementById("pfTag").value.trim().toLowerCase().replace(/^@/,"");errAt="tag";
+    if(!/^[a-z0-9_]{3,20}$/.test(u)){formErr="Gamertags are 3 to 20 letters, numbers or underscores.";return}
+    if(Object.values(USERS).some(x=>x.u===u)){formErr="That gamertag is taken. Try another.";return}
+    if(u!==S.me.username){S.me.username=u;S.inviteLink="";push("Gamertag changed","Friends now find you as @"+u+".",false)}},
+  savePw(){const c=document.getElementById("pfCur").value,n=document.getElementById("pfNew").value;errAt="pw";
+    if(!c){formErr="Enter your current password.";return}
+    if(n.length<8){formErr="Choose a new password with at least 8 characters.";return}
+    if(n===c){formErr="Choose a password different from your current one.";return}
+    push("Password changed","Use your new password the next time you sign in.",false)},
+  signinDone(){S.me={name:"Mike",username:"mike",google:true};S.friends=["jules","dev","rico"];const q=squad("dubclub");if(!q.members.includes("me"))q.members.unshift("me");S.invites=[];S.myGames={dubclub:clone(DEF_GAMES)};S.step="app";S.tab="home";S.squadId=null},toIntro(){S.step="intro"},
+  signup(){const n=document.getElementById("suName").value.trim(),u=document.getElementById("suUser").value.trim().toLowerCase().replace(/^@/,"");S.draftName=n;S.draftUser=u;const em=document.getElementById("suEmail");if(em){S.draftEmail=em.value.trim();
+      if(!/^\S+@\S+\.\S+$/.test(S.draftEmail)){formErr="Enter a valid email address.";return}
+      if(document.getElementById("suPass").value.length<8){formErr="Choose a password with at least 8 characters.";return}}
+    if(!n){formErr="Add your first name.";return}if(!/^[a-z0-9_]{3,20}$/.test(u)){formErr="Gamertags are 3 to 20 letters, numbers or underscores.";return}
+    if(Object.values(USERS).some(x=>x.u===u)){formErr="That gamertag is taken. Try another.";return}S.me={name:n,username:u,google:!!S.viaGoogle};S.step="friends"},
+  saveRank(){const id=S.rankFor,l=clone(S.rankDraft);S.myGames[id]=l;if(S.applyAll)mySquads().forEach(q=>S.myGames[q.id]=clone(l));finishRank()},
+  skipRank(){finishRank()},applyAll(){S.applyAll=!S.applyAll},
+  rank(d){S.tab="squads";S.squadId=d.id;startRank(d.id,false);scrollTo(0,0)},
+  mkLink(){S.inviteLink="dubsday.app/join/"+S.me.username+"-"+Math.random().toString(36).slice(2,6)},
+  friendsNext(){S.reqOut.forEach(id=>{if(!S.friends.includes(id))S.friends.push(id)});S.reqOut=[];S.step="squad"},
+  friendsSkip(){S.reqOut=[];S.step="squad"},
+  squadSkip(){S.step="app";S.tab="squads";S.squadId=null},
+  gameUp(d){const l=S.rankDraft,i=+d.i;[l[i-1],l[i]]=[l[i],l[i-1]]},gameDown(d){const l=S.rankDraft,i=+d.i;[l[i+1],l[i]]=[l[i],l[i+1]]},
+  gameDel(d){S.rankDraft.splice(+d.i,1)},
+  gameAdd(){const v=document.getElementById("newGame").value.trim();if(v&&S.rankDraft.length<5&&!S.rankDraft.some(g=>g.name.toLowerCase()===v.toLowerCase()))S.rankDraft.push({name:v,need:"2"});S.addOther=false},
+  tab(d){S.tab=d.id;S.squadId=null;S.rankFor=null},
+  openSquad(d){S.rankFor=null;S.tab="squads";S.squadId=d.id;S.dayOff=+d.off||0;scrollTo(0,0)},backSquads(){S.squadId=null},
+  day(d){S.dayOff=+d.off},
+  acceptInvite(d){withAlerts(()=>{squad(d.id).members.unshift("me");S.invites=S.invites.filter(i=>i.squad!==d.id)});afterJoin(d.id)},
+  simInvite(){S.invites=[{squad:"dubclub",from:"jules"}]},
+  sqLink(){S.sqLinks=S.sqLinks||{};S.sqLinks[S.squadId]="dubsday.app/squad/"+Math.random().toString(36).slice(2,8)},
+  declineInvite(d){S.invites=S.invites.filter(i=>i.squad!==d.id)},
+  join(){const c=document.getElementById("joinCode").value.trim().toUpperCase(),q=S.squads.find(x=>x.code===c);
+    if(!q){formErr="No squad uses that code. Check it with whoever invited you.";return}
+    if(!q.members.includes("me"))withAlerts(()=>{q.members.unshift("me");S.invites=S.invites.filter(i=>i.squad!==q.id)});if(S.rankFor!==q.id&&!(S.myGames[q.id]||[]).length)afterJoin(q.id);else{S.step="app";S.tab="squads";S.squadId=q.id;S.dayOff=0}},
+  createSquad(){const n=document.getElementById("newSquad").value.trim();if(!n)return;const id="s"+Date.now();
+    S.squads.push({id,name:n,code:Array.from({length:6},()=>"ABCDEFGHJKMNPQRSTUVWXYZ"[Math.floor(Math.random()*23)]).join(""),members:["me"]});afterJoin(id)},
+  inviteFriend(d){withAlerts(()=>squad(S.squadId).members.push(d.id));push(person(d.id).name+" joined",'In this prototype, invites are accepted right away.',false)},
+  leave(){delete S.myGames[S.squadId];const q=squad(S.squadId);q.members=q.members.filter(m=>m!=="me");S.squadId=null},
+  copy(d,el){try{navigator.clipboard.writeText(d.t).then(()=>{el.textContent="Copied"},()=>{})}catch(e){}return false},
+  addFriend(d){S.reqOut.push(d.id);if(S.step==="friends"){S.keepQ=document.getElementById("fq").value;return}document.getElementById("fres").innerHTML=friendResults(document.getElementById("fq").value);persist();return false},
+  acceptFriend(d){S.reqIn=S.reqIn.filter(x=>x!==d.id);S.friends.push(d.id)},
+  notif(d){S.notif[d.k]=!S.notif[d.k]},
+  a2hsHide(){S.a2hsHide=true},
+  lock(){lockOpen=true},unlock(){lockOpen=false},
+  reset(){S=fresh();sheet=null},
+  openSheet(){openSheet()},closeSheet(){sheet=null},
+  sheetDay(d){sheet.off=+d.off;if(sheet.start<minStart()){sheet.start=minStart();sheet.dur=Math.min(sheet.dur,SLOTS-sheet.start)}},
+  untilTwo(){sheet.dur=SLOTS-sheet.start;updateDial();return false},
+  rep(d){sheet.repeat=d.r},
+  sqAll(){sheet.squads="all"},
+  sqTog(d){let l=sheet.squads==="all"?[]:sheet.squads.slice();l=l.includes(d.id)?l.filter(x=>x!==d.id):l.concat(d.id);sheet.squads=l.length?l:"all"},
+  saveWin(){const w={day:dayKey(sheet.off),a:sheet.start,b:sheet.start+sheet.dur,squads:sheet.squads,repeat:sheet.repeat};const off=sheet.off;
+    withAlerts(()=>S.avail.me.push(w));sheet=null;if(S.squadId)S.dayOff=off},
+  delWin(d){S.avail.me.splice(+d.i,1)},
+  commit(d){const c=conflicts()[+d.i];if(c)S.commits.push({day:c.day,a:c.a,b:c.b,squad:d.id});push("You're in with "+squad(d.id).name,"That time is cleared from your other squads.",false)}
+};
+document.addEventListener("click",e=>{
+  const el=e.target.closest("[data-a]");if(!el)return;
+  if(el.dataset.a==="closeSheet"&&el.classList.contains("scrim")&&e.target.closest("[data-stop]"))return;
+  const prevErr=formErr;formErr="";const r=A[el.dataset.a](el.dataset,el);
+  if(r!==false)render();else if(prevErr)formErr=prevErr;
+});
+document.addEventListener("change",e=>{if(e.target.dataset.change==="addGame"){const v=e.target.value;if(v==="__other")S.addOther=true;else if(v&&S.rankDraft.length<5)S.rankDraft.push({name:v,need:"2"});render();return}
+  if(e.target.dataset.change==="need"){S.rankDraft[+e.target.dataset.i].need=e.target.value;persist()}});
+document.addEventListener("input",e=>{if(e.target.id==="fq")document.getElementById("fres").innerHTML=friendResults(e.target.value)});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&(sheet||lockOpen)){sheet=null;lockOpen=false;render()}
+  if(e.key==="Enter"&&e.target.tagName==="INPUT"){const m={suName:"signup",suUser:"signup",joinCode:"join",newSquad:"createSquad",newGame:"gameAdd",siEmail:"signinEmail",siPass:"signinEmail",suPass:"signup",pfTag:"saveTag",pfNew:"savePw"}[e.target.id];if(m){formErr="";A[m]({});render()}}});
+render();
+</script>
+</body>
+</html>
