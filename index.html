@@ -616,13 +616,14 @@ function vSheet(){
       <circle cx="150" cy="150" r="112" fill="none" stroke="var(--line)" stroke-width="26"/>
       ${Array.from({length:12},(_,i)=>{const a=i*30*Math.PI/180,x1=150+Math.sin(a)*86,y1=150-Math.cos(a)*86,x2=150+Math.sin(a)*(i%3?92:95),y2=150-Math.cos(a)*(i%3?92:95);return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--muted)" stroke-width="${i%3?1:2}"/>`}).join("")}
       ${[[12,150,80],[3,224,155],[6,150,230],[9,76,155]].map(([n,x,y])=>`<text x="${x}" y="${y}" text-anchor="middle">${n}</text>`).join("")}
-      <path id="arc1" fill="none" stroke="var(--solo)" stroke-width="26" stroke-linecap="round" style="cursor:grab"/>
+      <path id="arc1" fill="none" stroke="var(--cta)" stroke-width="26" stroke-linecap="round" style="cursor:grab"/>
       <path id="arc2" fill="none" stroke="#fff3c4" stroke-width="12" stroke-linecap="round"/>
-      <circle id="knobS" r="16" fill="var(--ink)" stroke="var(--solo)" stroke-width="5" tabindex="0" role="slider" aria-label="Start time"/>
+      <g id="grip" style="cursor:grab"><path id="gripO" fill="none" stroke="var(--ink)" stroke-width="17" stroke-linecap="round"/><path id="gripI" fill="none" stroke="var(--text)" stroke-width="9" stroke-linecap="round"/></g>
+      <circle id="knobS" r="16" fill="var(--ink)" stroke="var(--cta)" stroke-width="5" tabindex="0" role="slider" aria-label="Start time"/>
       <circle id="knobE" r="17" fill="var(--text)" stroke="var(--ink)" stroke-width="4" tabindex="0" role="slider" aria-label="End time"/>
-      <text class="big" id="dialStart" x="150" y="140" text-anchor="middle" style="font-size:25px"></text>
-      <text class="big" id="dialEnd" x="150" y="170" text-anchor="middle" style="font-size:25px"></text>
-      <text class="mid" id="dialDur" x="150" y="194" text-anchor="middle"></text>
+      <text class="big" id="dialStart" x="150" y="143" text-anchor="middle" style="font-size:21px"></text>
+      <text class="big" id="dialEnd" x="150" y="169" text-anchor="middle" style="font-size:21px"></text>
+      <text class="mid" id="dialDur" x="150" y="191" text-anchor="middle"></text>
     </svg></div>
     </div>
     <div class="stack" style="gap:8px"><p class="muted small">Repeat</p><div class="row wrap">${["none","daily","weekly"].map(r=>`<button class="chip ${sheet.repeat===r?"on":""}" data-a="rep" data-r="${r}">${r==="weekly"?"Every "+esc(wd):REP[r]}</button>`).join("")}</div></div>
@@ -647,11 +648,15 @@ function updateDial(){
   const ke=document.getElementById("knobE");ke.setAttribute("cx",kx);ke.setAttribute("cy",ky);ke.setAttribute("aria-valuetext",tl(end));
   document.getElementById("dialStart").textContent=tl(sheet.start);document.getElementById("dialEnd").textContent="to "+tl(end);
   document.getElementById("dialDur").textContent=durLabel(sheet.dur);
+  /* the pill shows only when it fits between the end circles without touching them:
+     each circle is about 19px (9.7deg) from its centre, the pill is 12deg plus 4.35deg caps each side */
+  const PILL=12,CAP=4.35,KNOB=9.7,GAP=1,fits=sw-2*KNOB-(PILL+2*CAP)>=2*GAP,mid=a0+sw/2,gd=fits?arcPath(mid-PILL/2,PILL,112):"";
+  document.getElementById("gripO").setAttribute("d",gd);document.getElementById("gripI").setAttribute("d",gd);
   const rp=sheet.repeat==="daily"?", every day":sheet.repeat==="weekly"?", weekly":"";
   document.getElementById("saveBtn").textContent="Save "+range(sheet.start,end)+rp;
 }
 function nudge(mode,n,base){
-  base=base||{start:sheet.start,dur:sheet.dur};const end=base.start+base.dur;
+  base=base||{start:sheet.start,dur:sheet.dur};sheet.touched=true;const end=base.start+base.dur;
   if(mode==="end")sheet.dur=clamp(end+n,base.start+1,SLOTS)-base.start;
   else if(mode==="start"){const ns=clamp(base.start+n,Math.min(minStart(),end-1),end-1);sheet.start=ns;sheet.dur=end-ns}
   else sheet.start=clamp(base.start+n,Math.min(minStart(),SLOTS-base.dur),SLOTS-base.dur);
@@ -695,11 +700,18 @@ function note(title,body){
   el.innerHTML=`<b>${esc(title)}</b>${body?` <span>${esc(body)}</span>`:""}`;box.appendChild(el);setTimeout(()=>el.remove(),4500);
 }
 async function withAlerts(fn){await fn();await sync()}
+/* where the dial starts: your last saved time, or 7pm to 10pm; for today,
+   if that has already started, the next half hour for the same length (stopping at 4am) */
+function defaultWindow(off){
+  let a=sl(19),b=sl(22);const last=(prefs.get("lastWin")||"").split(",").map(Number);
+  if(last.length===2&&last[0]>=0&&last[1]<=SLOTS&&last[0]<last[1]){a=last[0];b=last[1]}
+  if(off===0){const ns=nowSlot();if(ns>=a){const len=b-a;a=clamp(ns+1,0,SLOTS-1);b=Math.min(a+len,SLOTS)}}
+  return {start:a,dur:b-a};
+}
 function openSheet(){
   if(!mySquads().length){note("Join a squad first","Accept an invite on Home or enter a squad code.",false);return}
   const off=S.squadId&&S.tab==="squads"?S.dayOff:0;
-  const start=clamp(Math.round((Date.now()-dubBase(0).getTime())/(30*MIN)),0,SLOTS-1);
-  sheet={off,start,dur:Math.min(6,SLOTS-start),squads:"all",repeat:"none"};
+  sheet=Object.assign({off,squads:"all",repeat:"none",touched:false},defaultWindow(off));
 }
 const val=id=>{const e=document.getElementById(id);return e?e.value:""};
 const b64u=s=>{const p="=".repeat((4-s.length%4)%4),b=atob((s+p).replace(/-/g,"+").replace(/_/g,"/"));return Uint8Array.from(b,c=>c.charCodeAt(0))};
@@ -745,10 +757,10 @@ const A={
   async deleteAccount(){
     try{if("serviceWorker" in navigator){const reg=await navigator.serviceWorker.getRegistration();const sub=reg&&await reg.pushManager.getSubscription();if(sub)await sub.unsubscribe()}}catch(e){}
     await rpc("delete_account");
-    prefs.set("push",null);try{await sb.auth.signOut({scope:"local"})}catch(e){}
+    prefs.set("push",null);prefs.set("lastWin",null);try{await sb.auth.signOut({scope:"local"})}catch(e){}
     USERS={};ME=null;S=fresh();S.step="intro";sheet=null;note("Profile deleted","Your account and its data are gone.")},
   async signOut(){try{if("serviceWorker" in navigator){const reg=await navigator.serviceWorker.getRegistration();const sub=reg&&await reg.pushManager.getSubscription();if(sub){await rpc("delete_push_sub",{p_endpoint:sub.endpoint}).catch(()=>{});await sub.unsubscribe()}}}catch(e){}
-    prefs.set("push",null);await sb.auth.signOut();USERS={};ME=null;S=fresh();S.step="intro";sheet=null},
+    prefs.set("push",null);prefs.set("lastWin",null);await sb.auth.signOut();USERS={};ME=null;S=fresh();S.step="intro";sheet=null},
   async saveTag(){const u=val("pfTag").trim().toLowerCase().replace(/^@/,"");errAt="tag";
     if(!/^[a-z0-9_]{3,20}$/.test(u)){formErr="Gamertags are 3 to 20 letters, numbers or underscores.";return}
     if(u===S.me.username)return;
@@ -805,11 +817,11 @@ const A={
   a2hsHide(){prefs.set("a2hs","1")},
   lock(){lockOpen=true},unlock(){lockOpen=false},
   openSheet(){openSheet()},closeSheet(){sheet=null},
-  sheetDay(d){sheet.off=+d.off;if(sheet.start<minStart()){sheet.start=minStart();sheet.dur=Math.min(sheet.dur,SLOTS-sheet.start)}},
+  sheetDay(d){sheet.off=+d.off;if(!sheet.touched)Object.assign(sheet,defaultWindow(sheet.off));else if(sheet.start<minStart()){sheet.start=minStart();sheet.dur=Math.min(sheet.dur,SLOTS-sheet.start)}},
   rep(d){sheet.repeat=d.r},
   sqAll(){sheet.squads="all"},
   sqTog(d){let l=sheet.squads==="all"?[]:sheet.squads.slice();l=l.includes(d.id)?l.filter(x=>x!==d.id):l.concat(d.id);sheet.squads=l.length?l:"all"},
-  async saveWin(){const off=sheet.off,args={p_day:dayKey(off),p_a:sheet.start,p_b:sheet.start+sheet.dur,p_repeat:sheet.repeat,p_squads:sheet.squads==="all"?null:sheet.squads};
+  async saveWin(){prefs.set("lastWin",sheet.start+","+(sheet.start+sheet.dur));const off=sheet.off,args={p_day:dayKey(off),p_a:sheet.start,p_b:sheet.start+sheet.dur,p_repeat:sheet.repeat,p_squads:sheet.squads==="all"?null:sheet.squads};
     await withAlerts(()=>rpc("add_availability",args));sheet=null;if(S.squadId)S.dayOff=off},
   async delWin(d){await rpc("delete_availability",{aid:d.id});await sync()},
   async commit(d){const c=conflicts()[+d.i];if(!c)return;await rpc("commit_squad",{p_start:new Date(slotAbs(c.day,c.a)).toISOString(),p_end:new Date(slotAbs(c.day,c.b)).toISOString(),sid:d.id});await sync();note("You're in with "+squad(d.id).name,"That time is cleared from your other squads.",false)}
