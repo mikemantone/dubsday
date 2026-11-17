@@ -159,9 +159,12 @@ details.why ol{margin:6px 0 0;padding-left:18px}
 #dial .mid{font-size:14px;fill:var(--muted)}
 
 /* banner */
-#toasts{position:fixed;top:10px;left:50%;transform:translateX(-50%);width:calc(100% - 20px);max-width:420px;z-index:60;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+#toasts{position:fixed;top:auto;bottom:calc(84px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:calc(100% - 20px);max-width:420px;z-index:60;display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .push{pointer-events:auto;background:rgba(40,43,80,.96);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:18px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.5);animation:drop .35s ease-out}
 .push.full{border-color:var(--full-hot);box-shadow:0 0 30px rgba(43,107,255,.6)}
+.snack{pointer-events:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:14px;line-height:1.35;box-shadow:0 8px 24px rgba(0,0,0,.45);animation:rise .2s ease-out}
+.snack span{color:var(--muted)}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes drop{from{transform:translateY(-120%)}to{transform:none}}
 .appicon{width:38px;height:38px;border-radius:9px;background:var(--full);display:grid;place-items:center;font-family:var(--display);font-weight:900;font-stretch:150%;flex:none;color:#fff}
 .push b{display:block;font-size:15px}
@@ -194,23 +197,45 @@ details.why ol{margin:6px 0 0;padding-left:18px}
 "use strict";
 /* ---------- time: a dub day runs 4:00am to 4:00am, in 48 half-hour slots ---------- */
 const SLOTS=48, MIN=60000;
-function dubBase(off=0){const d=new Date(Date.now()-4*60*MIN);d.setHours(4,0,0,0);d.setDate(d.getDate()+off);return d}
-function dayKey(off){const d=dubBase(off);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
-function dayLabel(off,short){if(off===0)return short?"Today":"Today";if(off===1)return "Tomorrow";return dubBase(off).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})}
-function nowSlot(){return Math.floor((Date.now()-dubBase(0).getTime())/(30*MIN))}
+let TZ="America/New_York";
+const DEVICE_TZ=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||""}catch(e){return ""}})();
+const SLOTMS=30*MIN,_fmt={},_base={};
+function tzParts(ms,tz){const f=_fmt[tz]||(_fmt[tz]=new Intl.DateTimeFormat("en-US",{timeZone:tz,hourCycle:"h23",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}));
+  const o={};for(const p of f.formatToParts(new Date(ms)))if(p.type!=="literal")o[p.type]=+p.value;if(o.hour===24)o.hour=0;return o}
+function zonedToUtc(y,m,d,h,mi,tz){const want=Date.UTC(y,m-1,d,h,mi);let t=want;for(let i=0;i<2;i++){const p=tzParts(t,tz);t+=want-Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute)}return t}
+/* a dub day starts at 4:00am local time on its date */
+function dayBaseFor(day,tz){const k=day+"|"+tz;if(!(k in _base)){const [y,m,d]=day.split("-").map(Number);_base[k]=zonedToUtc(y,m,d,4,0,tz)}return _base[k]}
+function addDays(day,n){const [y,m,d]=day.split("-").map(Number);return new Date(Date.UTC(y,m-1,d+n)).toISOString().slice(0,10)}
+function todayKey(){const p=tzParts(Date.now(),TZ);return new Date(Date.UTC(p.year,p.month-1,p.day-(p.hour<4?1:0))).toISOString().slice(0,10)}
+function dayKey(off){return addDays(todayKey(),off)}
+function dubBase(off=0){return new Date(dayBaseFor(dayKey(off),TZ))}
+function dateText(off,opts){return new Date(dayKey(off)+"T12:00:00Z").toLocaleDateString(undefined,Object.assign({timeZone:"UTC"},opts))}
+function dayLabel(off){if(off===0)return "Today";if(off===1)return "Tomorrow";return dateText(off,{weekday:"short",month:"short",day:"numeric"})}
+function nowSlot(){return Math.floor((Date.now()-dubBase(0).getTime())/SLOTMS)}
+function hm(ms){const p=tzParts(ms,TZ),h=p.hour;return (h%12||12)+":"+String(p.minute).padStart(2,"0")+(h<12?"am":"pm")}
+function tzOffset(tz,ms){const p=tzParts(ms,tz);return Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute)-Math.floor(ms/MIN)*MIN}
+function sameZone(a,b){if(a===b)return true;try{const n=Date.now();return [0,91,182,273].every(d=>tzOffset(a,n+d*864e5)===tzOffset(b,n+d*864e5))}catch(e){return false}}
+const COMMON_TZ=[["America/New_York","Eastern Time"],["America/Chicago","Central Time"],["America/Denver","Mountain Time"],["America/Phoenix","Arizona"],["America/Los_Angeles","Pacific Time"],
+  ["America/Anchorage","Alaska"],["Pacific/Honolulu","Hawaii"],["America/Halifax","Atlantic Time"],["America/St_Johns","Newfoundland"],["Europe/London","UK and Ireland"],
+  ["Europe/Paris","Central Europe"],["Europe/Athens","Eastern Europe"],["Asia/Kolkata","India"],["Asia/Tokyo","Japan"],["Australia/Sydney","Sydney"],["Pacific/Auckland","New Zealand"]];
+function tzName(tz){const c=COMMON_TZ.find(x=>x[0]===tz);return c?c[1]:(tz||"").split("/").pop().replace(/_/g," ")}
+function tzSelect(id,sel){let all=[];try{all=Intl.supportedValuesOf("timeZone")}catch(e){}
+  all=[...new Set(all.concat([DEVICE_TZ,sel]).filter(Boolean))].filter(z=>!COMMON_TZ.some(c=>c[0]===z)).sort();
+  return `<select class="gsel" id="${id}" style="width:100%;min-height:46px;font-size:16px"><optgroup label="Common">${COMMON_TZ.map(([z,n])=>`<option value="${z}"${z===sel?" selected":""}>${esc(n)}</option>`).join("")}</optgroup>${all.length?`<optgroup label="All time zones">${all.map(z=>`<option value="${esc(z)}"${z===sel?" selected":""}>${esc(z.replace(/_/g," "))}</option>`).join("")}</optgroup>`:""}</select>`}
 function tl(s){const m=(240+s*30)%1440,h=Math.floor(m/60),mm=m%60,h12=h%12||12;return h12+":"+String(mm).padStart(2,"0")+(h<12?"am":"pm")}
 function range(a,b){return tl(a)+" to "+tl(b)}
 function durLabel(n){const h=Math.floor(n/2),m=n%2?30:0;return (h?h+"h":"")+(h&&m?" ":"")+(m?m+"m":"")}
 function sl(h){return ((h*60-240+1440)%1440)/30}
 function se(h){return sl(h)||SLOTS}
-function slotTime(off,s){return dubBase(off).getTime()+s*30*MIN}
+function slotTime(off,s){return dubBase(off).getTime()+s*SLOTMS}
+function slotAbs(day,s){return dayBaseFor(day,TZ)+s*SLOTMS}
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
 /* ---------- backend: every read and write goes through database functions ---------- */
 const SB_URL="https://pzwtkdyocvsrqfjvktkl.supabase.co",SB_KEY="sb_publishable_j1hrE2ewjtgNstJWrDUAbg_-FqkXveA";
 const sb=window.__sbMock||supabase.createClient(SB_URL,SB_KEY);
 let USERS={},ME=null;
-const GAME_IDEAS=["Gears of War: E-Day","Battlefield 6","Overwatch 2","Helldivers 2","Rocket League","Fortnite","Call of Duty: Warzone","Halo Infinite","Apex Legends","Minecraft"];
+const GAME_IDEAS=["Apex Legends","Battlefield 6","Call of Duty: Warzone","Enshrouded","Fortnite","Gears of War: E-Day","Halo Infinite","Helldivers 2","Minecraft","Monster Hunter Wilds","Overwatch 2","Rocket League","Sid Meier's Civilization VII","V Rising","Valheim"];
 function fresh(){return {step:"loading",tab:"home",squadId:null,dayOff:0,me:null,squads:[],invites:[],friends:[],reqIn:[],reqOut:[],avail:{me:[]},commits:[],rank:{},
   notif:{found:true,warn:true,live:true},hasSession:false,google:false,email:"",linkInvite:null,searchQ:"",searchRes:[],sqLinks:{}}}
 let S=fresh();
@@ -220,7 +245,7 @@ async function rpc(fn,args){const {data,error}=await sb.rpc(fn,args||{});if(erro
 function applyState(st){
   if(!st||!st.me){S.me=null;ME=null;return}
   ME=st.me.id;const id=x=>x===ME?"me":x;
-  S.me={name:st.me.first_name,username:st.me.gamertag,friendToken:st.me.friend_token,google:S.google};
+  S.me={name:st.me.first_name,username:st.me.gamertag,friendToken:st.me.friend_token,google:S.google};TZ=st.me.tz||"America/New_York";
   S.notif=Object.assign({found:true,warn:true,live:true},st.me.notif||{});
   USERS={};for(const k in st.people)USERS[k]=st.people[k];
   st.req_in.concat(st.req_out).forEach(r=>{if(!USERS[r.id])USERS[r.id]={name:null,u:r.u}});
@@ -228,15 +253,15 @@ function applyState(st){
   S.squads=st.squads.map(q=>({id:q.id,name:q.name,code:q.code,token:q.invite_token,members:(q.members||[]).map(id)}));
   S.invites=st.invites;
   S.rank={};st.rankings.forEach(r=>{(S.rank[r.squad]=S.rank[r.squad]||{})[id(r.uid)]=r.games});
-  S.avail={me:[]};st.avail.forEach(w=>{const u=id(w.uid);(S.avail[u]=S.avail[u]||[]).push({id:w.id,day:w.day,a:w.a,b:w.b,repeat:w.repeat,squads:w.squads===null?"all":w.squads})});
-  S.commits=st.commits.map(c=>({uid:id(c.uid),day:c.day,a:c.a,b:c.b,squad:c.squad}));
+  S.avail={me:[]};st.avail.forEach(w=>{const u=id(w.uid);(S.avail[u]=S.avail[u]||[]).push({id:w.id,day:w.day,a:w.a,b:w.b,repeat:w.repeat,tz:w.tz||"America/New_York",squads:w.squads===null?"all":w.squads})});
+  S.commits=st.commits.map(c=>({uid:id(c.uid),s:Date.parse(c.starts_at),e:Date.parse(c.ends_at),squad:c.squad}));expand();
   if(S.squadId&&!S.squads.some(q=>q.id===S.squadId))S.squadId=null;
   if(S.linkInvite&&S.squads.some(q=>q.id===S.linkInvite.squad)){S.linkInvite=null;prefs.set("invite",null)}
 }
 async function sync(){applyState(await rpc("get_state"))}
 const ERR={gamertag_taken:"That gamertag is taken. Try another.",bad_gamertag:"Gamertags are 3 to 20 letters, numbers or underscores.",bad_name:"Use a name of 20 characters or fewer.",
   no_squad:"No squad uses that code. Check it with whoever invited you.",squad_full:"That squad is full.",not_friends:"You can only invite people on your friends list.",
-  too_many_squads:"You are in the maximum number of squads.",not_signed_in:"Your session ended. Sign in again.",no_profile:"Finish creating your profile first.",bad_day:"That day is too far away."};
+  too_many_squads:"You are in the maximum number of squads.",not_signed_in:"Your session ended. Sign in again.",no_profile:"Finish creating your profile first.",bad_day:"That day is too far away.",bad_tz:"That time zone is not supported. Pick another one."};
 function errText(e){const m=(e&&e.message)||String(e);for(const k in ERR)if(m.includes(k))return ERR[k];
   if(/Invalid login credentials/i.test(m))return "That email and password do not match an account.";
   if(/not authorized|not confirmed|confirmation/i.test(m))return "Email sign-up is not fully set up yet. Ask Mike to turn off email confirmation.";
@@ -266,12 +291,15 @@ function finishRank(){const then=S.rankThenAvail;S.rankFor=null;S.rankDraft=null
 
 /* ---------- scheduling logic ---------- */
 function winOn(w,day){if(w.day===day)return true;if(!w.repeat||w.repeat==="none"||day<w.day)return false;
-  return w.repeat==="daily"||new Date(w.day+"T12:00").getDay()===new Date(day+"T12:00").getDay()}
-function hasUpcomingAvail(){const ns=nowSlot();for(let o=0;o<7;o++){const d=dayKey(o);if(S.avail.me.some(w=>winOn(w,d)&&!(o===0&&w.b<=ns)))return true}return false}
+  return w.repeat==="daily"||new Date(w.day+"T12:00:00Z").getUTCDay()===new Date(day+"T12:00:00Z").getUTCDay()}
+/* each window, in its owner's time zone, expanded to real start and end instants */
+function expand(){const t0=todayKey();S.iv={};
+  for(const uid in S.avail){const list=S.iv[uid]=[];for(const w of S.avail[uid])for(let k=-3;k<=10;k++){const d=addDays(t0,k);if(!winOn(w,d))continue;const b=dayBaseFor(d,w.tz);list.push({s:b+w.a*SLOTMS,e:b+w.b*SLOTMS,squads:w.squads,w})}}}
+function hasUpcomingAvail(){const n=Date.now();return ((S.iv||{}).me||[]).some(x=>x.e>n&&x.s<n+7*864e5)}
 function isAvail(uid,sq,day,s){
-  const ws=S.avail[uid]||[];
-  if(!ws.some(w=>winOn(w,day)&&w.a<=s&&s<w.b&&(w.squads==="all"||w.squads.includes(sq))))return false;
-  if(S.commits.some(c=>c.uid===uid&&c.day===day&&c.a<=s&&s<c.b&&c.squad!==sq))return false;
+  const t=slotAbs(day,s),u=t+SLOTMS;
+  if(!(((S.iv||{})[uid])||[]).some(x=>x.s<=t&&u<=x.e&&(x.squads==="all"||x.squads.includes(sq))))return false;
+  if(S.commits.some(c=>c.uid===uid&&c.squad!==sq&&c.s<u&&c.e>t))return false;
   return true;
 }
 function slotMembers(q,day,s){return q.members.filter(m=>isAvail(m,q.id,day,s))}
@@ -403,6 +431,7 @@ function vSignup(){
   <div class="field"><label for="suPass">Password</label><input type="password" id="suPass" autocomplete="new-password"><span class="muted small">At least 8 characters.</span></div>`}
   <div class="field"><label for="suName">First name</label><input type="text" id="suName" value="${esc(S.draftName||"")}" maxlength="20"><span class="muted small">This is how you appear in your squads' schedules. Add a last initial if you need one, like Mike M.</span></div>
   <div class="field"><label for="suUser">Gamertag</label><input type="text" id="suUser" value="${esc(S.draftUser||"")}" maxlength="20" autocapitalize="off"><span class="muted small">Friends search for you by gamertag. Squads are never searchable.</span></div>
+  <div class="field"><label for="suTz">Time zone</label>${tzSelect("suTz",S.draftTz||DEVICE_TZ||"America/New_York")}<span class="muted small">Set from your device. Your schedule and DubTimes show in this time zone. You can change it later in Profile.</span></div>
   ${formErr?`<p class="err">${esc(formErr)}</p>`:""}
   <button class="btn primary block" data-a="signup">Create profile</button>${S.hasSession?`<button class="btn ghost block" data-a="signOut">Use a different account</button>`:`<button class="btn ghost block" data-a="toStart">Back</button>`}`;
 }
@@ -441,7 +470,8 @@ function vHome(){
     hero=`<div class="stack"><p class="muted">${ms>0?`Next up in ${h>=24?Math.floor(h/24)+"d "+(h%24)+"h":h+"h "+m+"m"}`:"Happening now"}</p>${blockCard(next,{day:true,squad:true,open:true})}</div>`}
   else hero=`<div class="panel stack"><p>${qs.length?"Your time is in. Nothing overlaps with your squad yet, and you will get a notification when it does.":"Join a squad to see when everyone can play."}</p>${qs.length?"":`<button class="btn primary" data-a="tab" data-id="squads">Create or join a squad</button>`}</div>`;
   const rest=mb.slice(1,6);
-  return `<div class="row"><div class="grow"><p class="muted small">${esc(dubBase(0).toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}))}</p><h1>${today?"It's DubsDay, "+esc(S.me.name)+".":"Who's ready for dubs?"}</h1></div></div>
+  return `<div class="row"><div class="grow"><p class="muted small">${esc(dateText(0,{weekday:"long",month:"long",day:"numeric"}))}</p><h1>${today?"It's DubsDay, "+esc(S.me.name)+".":"Who's ready for dubs?"}</h1></div></div>
+  ${DEVICE_TZ&&!sameZone(DEVICE_TZ,TZ)&&prefs.get("tzkeep")!==DEVICE_TZ+"|"+TZ?`<div class="panel stack"><div><strong>Your phone is on ${esc(tzName(DEVICE_TZ))}</strong><p class="muted small">DubsDay is showing ${esc(tzName(TZ))}. Switch so your schedule matches your clock?</p></div><div class="row wrap"><button class="btn sm primary" data-a="useDeviceTz">Use ${esc(tzName(DEVICE_TZ))}</button><button class="btn sm ghost" data-a="keepTz">Keep ${esc(tzName(TZ))}</button></div></div>`:""}
   ${inv}${cfh}${hero}
   ${(need?mb:rest).length?`<div class="stack"><h3>Coming up</h3>${(need?mb.slice(0,5):rest).map(b=>blockCard(b,{day:true,squad:true,open:true})).join("")}</div>`:""}
   ${!need&&qs.length?`<button class="btn cta block" data-a="openSheet">Set dub availability</button>`:""}
@@ -488,7 +518,7 @@ function vSquad(){
   ${bl.length?`<div class="stack">${bl.map(b=>blockCard(b)).join("")}</div>`:`<p class="muted">No overlap on this dub day yet.</p>`}
   <div class="legend"><span><i class="dot solo"></i>No overlap</span><span><i class="dot dub"></i>DubTime</span><span><i class="dot full"></i>Full-Squad DubTime</span></div>
   <div class="schedwrap" data-k="${q.id}|${off}" data-top="${top-first}"><div class="sched" style="grid-template-columns:${cols}">${h}</div></div>
-  <p class="muted small">${off===0?"Starts an hour before now and runs":"Runs"} to the end of the dub day at 4:00am.</p>
+  <p class="muted small">${off===0?"Starts an hour before now and runs":"Runs"} to the end of the dub day at 4:00am. Times are in ${esc(tzName(TZ))}.</p>
   ${mineG.length?`<div class="panel stack"><div class="row"><h3 class="grow">Your game rankings here</h3><button class="btn sm" data-a="rank" data-id="${q.id}">Edit</button></div>${mineG.map((g,i)=>`<div class="row"><span class="rank">${i+1}</span><span class="grow">${esc(g.name)}</span><span class="muted small">${g.need==="full"?"Full squad only":g.need+"+ players"}</span></div>`).join("")}</div>`:""}
   <div class="panel stack"><h3>Members</h3>
     ${order.map(m=>`<div class="row">${avatar(m)}<div class="grow"><strong>${m==="me"?"You":esc(person(m).name)}</strong><div class="muted small">@${esc(person(m).u)}</div></div></div>`).join("")}
@@ -519,6 +549,8 @@ function vProfile(){
   return `<div class="row">${avatar("me")}<div class="grow"><h2>${esc(S.me.name)}</h2><span class="muted">@${esc(S.me.username)}</span></div></div>
   <div class="panel stack"><h3>Change gamertag</h3><div class="row"><input type="text" id="pfTag" value="${esc(S.me.username)}" maxlength="20" autocapitalize="off" aria-label="Gamertag"><button class="btn" data-a="saveTag">Save</button></div>
     ${err("tag")}<p class="muted small">Friends search for you by gamertag. Your squads and friends stay the same when you change it.</p></div>
+  <div class="panel stack"><h3>Time zone</h3><div class="row"><div class="grow" style="min-width:0">${tzSelect("pfTz",TZ)}</div><button class="btn" data-a="saveTz">Save</button></div>
+    ${err("tz")}<p class="muted small">Schedules, DubTimes and notifications show in this time zone. Times you have already set keep their clock time, so 8pm stays 8pm.</p></div>
   <div class="panel stack"><h3>Change password</h3>${S.google?`<p class="muted small">You sign in with Google, so this account has no DubsDay password.</p>`:`<div class="field"><label for="pfCur">Current password</label><input type="password" id="pfCur" autocomplete="current-password"></div>
     <div class="field"><label for="pfNew">New password</label><input type="password" id="pfNew" autocomplete="new-password"><span class="muted small">At least 8 characters.</span></div>
     ${err("pw")}<button class="btn" data-a="savePw">Change password</button>`}</div>
@@ -537,7 +569,7 @@ function vLock(){
   const a=b?b.a:sl(21),e=b?b.b:sl(23),full=b?b.tier==="full":true,g=b?pickGame(q,b.members).game:"";
   const title=full?"Full-Squad DubTime":"DubTime",d=new Date();
   return `<div class="lock"><div class="in">
-    <div class="clock">${tl(a).replace(/[ap]m/,"")}</div><div class="date">${esc(d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}))}</div>
+    <div class="clock">${tl(a).replace(/[ap]m/,"")}</div><div class="date">${esc(dateText(0,{weekday:"long",month:"long",day:"numeric"}))}</div>
     <div class="la"><div class="row"><span class="appicon">W</span><div class="grow"><strong>${title} is live</strong><div class="muted small">${esc(q.name)}${g?", "+esc(g):""}</div></div></div>
       <div class="row" style="align-items:flex-end"><div class="grow"><div class="muted small">Time remaining</div><div class="rem">${durLabel(e-a)||"0m"}</div></div><div class="muted small" style="text-align:right">${range(a,e)}</div></div>
       <div class="bar"><i style="width:6%"></i></div></div>
@@ -548,12 +580,12 @@ function vLock(){
 }
 const REP={none:"Just this day",daily:"Every day",weekly:""};
 function vSheet(){
-  const qs=mySquads(),day=dayKey(sheet.off),mine=S.avail.me.map(w=>({w})).filter(x=>winOn(x.w,day)).sort((x,y)=>x.w.a-y.w.a);
-  const wd=dubBase(sheet.off).toLocaleDateString(undefined,{weekday:"long"});
+  const qs=mySquads(),day=dayKey(sheet.off),d0=slotAbs(day,0),d1=slotAbs(day,SLOTS),mine=((S.iv||{}).me||[]).filter(x=>x.s<d1&&x.e>d0).sort((x,y)=>x.s-y.s);
+  const wd=dateText(sheet.off,{weekday:"long"});
   return `<div class="scrim" data-a="closeSheet"><div class="sheet" role="dialog" aria-label="Set dub availability" data-stop>
     <div class="row"><h2 class="grow">When can you dub?</h2><button class="btn sm ghost" data-a="closeSheet">Close</button></div>
     <div class="chips">${[0,1,2,3,4,5,6].map(o=>`<button class="chip ${o===sheet.off?"on":""}" data-a="sheetDay" data-off="${o}">${esc(dayLabel(o))}</button>`).join("")}</div>
-    ${mine.length?`<div class="stack" style="gap:8px"><p class="muted small">Already set for this day</p>${mine.map(x=>`<div class="row"><i class="dot solo"></i><span class="grow">${range(x.w.a,x.w.b)} <span class="muted small">${x.w.squads==="all"?"all squads":x.w.squads.map(id=>esc(squad(id)?squad(id).name:"")).join(", ")}${x.w.repeat==="daily"?", repeats daily":x.w.repeat==="weekly"?", repeats weekly":""}</span></span><button class="btn sm ghost" data-a="delWin" data-id="${x.w.id}">${x.w.repeat&&x.w.repeat!=="none"?"Remove all":"Remove"}</button></div>`).join("")}</div>`:""}
+    ${mine.length?`<div class="stack" style="gap:8px"><p class="muted small">Already set for this day</p>${mine.map(x=>`<div class="row"><i class="dot solo"></i><span class="grow">${hm(x.s)} to ${hm(x.e)} <span class="muted small">${x.w.squads==="all"?"all squads":x.w.squads.map(id=>esc(squad(id)?squad(id).name:"")).join(", ")}${x.w.repeat==="daily"?", repeats daily":x.w.repeat==="weekly"?", repeats weekly":""}</span></span><button class="btn sm ghost" data-a="delWin" data-id="${x.w.id}">${x.w.repeat&&x.w.repeat!=="none"?"Remove all":"Remove"}</button></div>`).join("")}</div>`:""}
     <div><p class="muted small">Drag either end to change when you start or stop. Drag the yellow band to move the whole time.</p>
     <div class="dialwrap"><svg id="dial" viewBox="0 0 300 300" aria-label="Availability clock">
       <circle cx="150" cy="150" r="112" fill="none" stroke="var(--line)" stroke-width="26"/>
@@ -631,19 +663,14 @@ function render(){
   const fq=document.getElementById("fq");if(fq){fq.value=S.searchQ;document.getElementById("fres").innerHTML=friendResults()}
   if(sheet){bindDial();const n=document.querySelector(".sheet");if(n)n.scrollTop=st}
 }
-function push(title,body,full,act){
-  const el=document.createElement("button");el.className="push"+(full?" full":"");
-  el.innerHTML=`<span class="appicon">W</span><div><b>${esc(title)}</b><span>${esc(body)}</span></div>`;
-  el.onclick=()=>{el.remove();if(act)act()};document.getElementById("toasts").appendChild(el);setTimeout(()=>el.remove(),8000);
+/* short confirmations and errors; push notifications only ever come from the phone */
+function note(title,body){
+  const box=document.getElementById("toasts");box.innerHTML="";const el=document.createElement("div");el.className="snack";el.setAttribute("role","status");
+  el.innerHTML=`<b>${esc(title)}</b>${body?` <span>${esc(body)}</span>`:""}`;box.appendChild(el);setTimeout(()=>el.remove(),4500);
 }
-async function withAlerts(fn){
-  const before=new Set(myBlocks().map(blockId));await fn();await sync();
-  const fresh=myBlocks().filter(b=>!before.has(blockId(b))).sort((x,y)=>(y.tier==="full")-(x.tier==="full"));
-  fresh.slice(0,2).forEach(b=>{const q=squad(b.squad),g=pickGame(q,b.members).game;
-    push((b.tier==="full"?"Full-Squad DubTime":"DubTime")+" found",`${q.name}: ${whenText(b)}.${g?" Pick: "+g+".":""}`,b.tier==="full",()=>{S.tab="squads";S.squadId=q.id;S.dayOff=b.off;sheet=null;render()})});
-}
+async function withAlerts(fn){await fn();await sync()}
 function openSheet(){
-  if(!mySquads().length){push("Join a squad first","Accept an invite on Home or enter a squad code.",false);return}
+  if(!mySquads().length){note("Join a squad first","Accept an invite on Home or enter a squad code.",false);return}
   const off=S.squadId&&S.tab==="squads"?S.dayOff:0;
   const start=clamp(Math.round((Date.now()-dubBase(0).getTime())/(30*MIN)),0,SLOTS-1);
   sheet={off,start,dur:Math.min(6,SLOTS-start),squads:"all",repeat:"none"};
@@ -665,7 +692,7 @@ async function enter(){
 }
 async function friendLink(){
   const ft=prefs.get("friend");if(!ft||!S.me)return;prefs.set("friend",null);
-  try{const nm=await rpc("accept_friend_link",{token:ft});if(nm){await sync();push("You and "+nm+" are now friends","They are on your friends list.",false)}}catch(e){}
+  try{const nm=await rpc("accept_friend_link",{token:ft});if(nm){await sync();note("You and "+nm+" are now friends","They are on your friends list.",false)}}catch(e){}
 }
 const A={
   async google(){const {error}=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin}});if(error)throw error;return false},
@@ -675,7 +702,7 @@ const A={
     if(!pw){formErr="Enter your password.";return}
     const {error}=await sb.auth.signInWithPassword({email:e,password:pw});if(error)throw error;
     await enter()},
-  async signup(){const n=val("suName").trim(),u=val("suUser").trim().toLowerCase().replace(/^@/,"");S.draftName=n;S.draftUser=u;
+  async signup(){const n=val("suName").trim(),u=val("suUser").trim().toLowerCase().replace(/^@/,"");S.draftName=n;S.draftUser=u;S.draftTz=val("suTz");
     if(!S.hasSession){S.draftEmail=val("suEmail").trim();
       if(!/^\S+@\S+\.\S+$/.test(S.draftEmail)){formErr="Enter a valid email address.";return}
       if(val("suPass").length<8){formErr="Choose a password with at least 8 characters.";return}}
@@ -683,20 +710,23 @@ const A={
     if(!S.hasSession){const {data,error}=await sb.auth.signUp({email:S.draftEmail,password:val("suPass")});if(error)throw error;
       if(!data.session){formErr="Check your email for a confirmation link, then come back and sign in.";return}
       S.hasSession=true;S.email=S.draftEmail;S.google=false}
-    await rpc("create_profile",{p_first_name:n,p_gamertag:u});await sync();await friendLink();S.step="friends"},
+    await rpc("create_profile",{p_first_name:n,p_gamertag:u,p_tz:S.draftTz||"America/New_York"});await sync();await friendLink();S.step="friends"},
   async signOut(){try{if("serviceWorker" in navigator){const reg=await navigator.serviceWorker.getRegistration();const sub=reg&&await reg.pushManager.getSubscription();if(sub){await rpc("delete_push_sub",{p_endpoint:sub.endpoint}).catch(()=>{});await sub.unsubscribe()}}}catch(e){}
     prefs.set("push",null);await sb.auth.signOut();USERS={};ME=null;S=fresh();S.step="intro";sheet=null},
   async saveTag(){const u=val("pfTag").trim().toLowerCase().replace(/^@/,"");errAt="tag";
     if(!/^[a-z0-9_]{3,20}$/.test(u)){formErr="Gamertags are 3 to 20 letters, numbers or underscores.";return}
     if(u===S.me.username)return;
-    await rpc("update_profile",{p_first_name:null,p_gamertag:u,p_notif:null});await sync();push("Gamertag changed","Friends now find you as @"+u+".",false)},
+    await rpc("update_profile",{p_first_name:null,p_gamertag:u,p_notif:null});await sync();note("Gamertag changed","Friends now find you as @"+u+".",false)},
+  async saveTz(){const z=val("pfTz");errAt="tz";if(!z||z===TZ)return;await rpc("update_profile",{p_first_name:null,p_gamertag:null,p_notif:null,p_tz:z});await sync();note("Time zone changed","Showing times in "+tzName(z)+".")},
+  async useDeviceTz(){await rpc("update_profile",{p_first_name:null,p_gamertag:null,p_notif:null,p_tz:DEVICE_TZ});await sync();note("Time zone changed","Showing times in "+tzName(DEVICE_TZ)+".")},
+  keepTz(){prefs.set("tzkeep",DEVICE_TZ+"|"+TZ)},
   async savePw(){const c=val("pfCur"),n=val("pfNew");errAt="pw";
     if(!c){formErr="Enter your current password.";return}
     if(n.length<8){formErr="Choose a new password with at least 8 characters.";return}
     if(n===c){formErr="Choose a password different from your current one.";return}
     const chk=await sb.auth.signInWithPassword({email:S.email,password:c});if(chk.error){formErr="Your current password is not right.";return}
     const up=await sb.auth.updateUser({password:n});if(up.error)throw up.error;
-    push("Password changed","Use your new password the next time you sign in.",false)},
+    note("Password changed","Use your new password the next time you sign in.",false)},
   async enablePush(){errAt="push";
     if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window)){formErr=installed()?"This device does not support notifications.":"Add DubsDay to your Home Screen, open it from there, then try again.";return}
     const perm=await Notification.requestPermission();
@@ -705,7 +735,7 @@ const A={
     const key=await rpc("push_public_key");if(!key){formErr="Notifications are still being set up. Try again in a minute.";return}
     const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(key)}),j=sub.toJSON();
     await rpc("save_push_sub",{p_endpoint:j.endpoint,p_p256dh:j.keys.p256dh,p_auth:j.keys.auth});prefs.set("push","1");
-    push("Notifications are on","You will hear when DubTime is found and before it starts.",false)},
+    note("Notifications are on","You will hear when DubTime is found and before it starts.",false)},
   async saveRank(){const id=S.rankFor;await rpc("set_rankings",{sid:id,p_games:S.rankDraft,apply_all:!!S.applyAll});await sync();finishRank()},
   skipRank(){finishRank()},applyAll(){S.applyAll=!S.applyAll},
   rank(d){S.tab="squads";S.squadId=d.id;startRank(d.id,false);scrollTo(0,0)},
@@ -728,7 +758,7 @@ const A={
     if(!was.includes(id))afterJoin(id);else{S.step="app";S.tab="squads";S.squadId=id;S.dayOff=0}},
   async createSquad(){const n=val("newSquad").trim();if(!n){formErr="Give your squad a name.";return}
     const id=await rpc("create_squad",{p_name:n});await sync();afterJoin(id)},
-  async inviteFriend(d){await rpc("invite_friend_to_squad",{sid:S.squadId,friend:d.id});push("Invite sent",person(d.id).name+" will see it on their Home screen.",false)},
+  async inviteFriend(d){await rpc("invite_friend_to_squad",{sid:S.squadId,friend:d.id});note("Invite sent",person(d.id).name+" will see it on their Home screen.",false)},
   async leave(){await rpc("leave_squad",{sid:S.squadId});S.squadId=null;await sync()},
   copy(d,el){try{navigator.clipboard.writeText(d.t).then(()=>{el.textContent="Copied"},()=>{})}catch(e){}return false},
   async addFriend(d){await rpc("send_friend_request",{target:d.id});await sync()},
@@ -745,12 +775,12 @@ const A={
   async saveWin(){const off=sheet.off,args={p_day:dayKey(off),p_a:sheet.start,p_b:sheet.start+sheet.dur,p_repeat:sheet.repeat,p_squads:sheet.squads==="all"?null:sheet.squads};
     await withAlerts(()=>rpc("add_availability",args));sheet=null;if(S.squadId)S.dayOff=off},
   async delWin(d){await rpc("delete_availability",{aid:d.id});await sync()},
-  async commit(d){const c=conflicts()[+d.i];if(!c)return;await rpc("commit_squad",{p_day:c.day,p_a:c.a,p_b:c.b,sid:d.id});await sync();push("You're in with "+squad(d.id).name,"That time is cleared from your other squads.",false)}
+  async commit(d){const c=conflicts()[+d.i];if(!c)return;await rpc("commit_squad",{p_start:new Date(slotAbs(c.day,c.a)).toISOString(),p_end:new Date(slotAbs(c.day,c.b)).toISOString(),sid:d.id});await sync();note("You're in with "+squad(d.id).name,"That time is cleared from your other squads.",false)}
 };
-const QUIET=new Set(["join","saveTag","savePw","enablePush","createSquad"]);
+const QUIET=new Set(["join","saveTag","savePw","enablePush","createSquad","saveTz"]);
 async function run(name,data,el){
   if(busy||!A[name])return;busy=true;formErr="";errAt="";let r;
-  try{r=await Promise.race([A[name](data||{},el),new Promise((_,rej)=>setTimeout(()=>rej(new Error("That is taking too long. Check your connection and try again.")),25000))])}catch(err){formErr=errText(err);if(S.step==="app"&&!QUIET.has(name))push("That did not work",formErr,false)}
+  try{r=await Promise.race([A[name](data||{},el),new Promise((_,rej)=>setTimeout(()=>rej(new Error("That is taking too long. Check your connection and try again.")),25000))])}catch(err){formErr=errText(err);if(S.step==="app"&&!QUIET.has(name))note("That did not work",formErr,false)}
   busy=false;if(r!==false)render();
 }
 document.addEventListener("click",e=>{
