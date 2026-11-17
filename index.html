@@ -409,6 +409,23 @@ function blockCard(b,opts={}){
   </div>`;
 }
 
+function gamesEditor(){
+  const list=S.rankDraft;
+  return `<div class="stack">
+    ${list.map((g,i)=>`<div class="panel row" style="padding:12px">
+      <span class="rank">${i+1}</span>
+      <div class="grow stack" style="gap:8px"><strong>${esc(g.name)}</strong>
+      <div class="row"><select class="gsel" id="need-${i}" data-change="need" data-i="${i}" aria-label="Players needed for ${esc(g.name)}">
+        <option value="2"${g.need==="2"?" selected":""}>2+ players</option><option value="3"${g.need==="3"?" selected":""}>3+ players</option><option value="full"${g.need==="full"?" selected":""}>Full squad only</option></select>
+      <button class="icon" data-a="gameUp" data-i="${i}" aria-label="Move ${esc(g.name)} up" ${i===0?"disabled":""}>↑</button>
+      <button class="icon" data-a="gameDown" data-i="${i}" aria-label="Move ${esc(g.name)} down" ${i===list.length-1?"disabled":""}>↓</button>
+      <button class="icon" data-a="gameDel" data-i="${i}" aria-label="Remove ${esc(g.name)}">✕</button></div></div></div>`).join("")}
+    ${list.length<5?`<select class="gsel" id="newGameSel" data-change="addGame" aria-label="Add a game" style="flex:none;width:100%;min-height:46px;font-size:16px"><option value="">Add a game</option>${GAME_IDEAS.filter(n=>!list.some(g=>g.name===n)).map(n=>`<option>${esc(n)}</option>`).join("")}<option value="__other">Something else…</option></select>
+    ${S.addOther?`<div class="row"><input type="text" id="newGame" placeholder="Game title" aria-label="Game title"><button class="btn" data-a="gameAdd">Add</button></div>`:""}`:`<p class="muted small">Five games is the limit. Remove one to add another.</p>`}
+    <p class="muted small">Rank 1 is your top pick. A game set to full squad only is skipped whenever someone is missing.</p>
+  </div>`;
+}
+
 /* ---------- screens ---------- */
 function inviteCards(){
   const link=S.linkInvite?`<div class="panel row wrap" style="border-color:var(--full-hot)"><div class="grow"><strong>You are invited to ${esc(S.linkInvite.name)}</strong><div class="muted small">${S.linkInvite.members} ${S.linkInvite.members===1?"member":"members"}, from a squad invite link</div></div><button class="btn sm primary" data-a="acceptLink">Join squad</button><button class="btn sm ghost" data-a="declineLink">Decline</button></div>`:"";
@@ -492,10 +509,10 @@ function vHome(){
   else hero=`<div class="panel stack"><p>${qs.length?"Your time is in. Nothing overlaps with your squad yet, and you will get a notification when it does.":"Join a squad to see when everyone can play."}</p>${qs.length?"":`<button class="btn primary" data-a="tab" data-id="squads">Create or join a squad</button>`}</div>`;
   const rest=mb.slice(1,6);
   return `<div class="row"><div class="grow"><p class="muted small">${esc(dateText(0,{weekday:"long",month:"long",day:"numeric"}))}</p><h1>${today?"It's Dubs<span class=\"wm-day\">Day</span>, "+esc(S.me.name)+".":"Who's ready for dubs?"}</h1></div></div>
+  ${!need&&qs.length?`<button class="btn cta block" data-a="openSheet">Set dub availability</button>`:""}
   ${DEVICE_TZ&&!sameZone(DEVICE_TZ,TZ)&&prefs.get("tzkeep")!==DEVICE_TZ+"|"+TZ?`<div class="panel stack"><div><strong>Your phone is on ${esc(tzName(DEVICE_TZ))}</strong><p class="muted small">DubsDay is showing ${esc(tzName(TZ))}. Switch so your schedule matches your clock?</p></div><div class="row wrap"><button class="btn sm primary" data-a="useDeviceTz">Use ${esc(tzName(DEVICE_TZ))}</button><button class="btn sm ghost" data-a="keepTz">Keep ${esc(tzName(TZ))}</button></div></div>`:""}
   ${inv}${cfh}${hero}
   ${(need?mb:rest).length?`<div class="stack"><h3>Coming up</h3>${(need?mb.slice(0,5):rest).map(b=>blockCard(b,{day:true,squad:true,open:true})).join("")}</div>`:""}
-  ${!need&&qs.length?`<button class="btn cta block" data-a="openSheet">Set dub availability</button>`:""}
   ${installed()||prefs.get("a2hs")?"":`<div class="panel stack"><div class="row"><span class="appicon" aria-hidden="true"></span><div class="grow"><strong>Add DubsDay to your Home Screen</strong><div class="muted small">It opens like an app, and on iPhone it is what lets DubsDay send you notifications.</div></div></div>
     <ol class="steps"><li><span>Open DubsDay in Safari and tap the Share button.</span></li><li><span>Choose Add to Home Screen.</span></li><li><span>Open DubsDay from the new icon and allow notifications.</span></li></ol>
     <button class="btn sm ghost" data-a="a2hsHide" style="align-self:flex-start">Not now</button></div>`}`;
@@ -679,6 +696,15 @@ function bindDial(){
 
 /* ---------- render ---------- */
 function render(){
+  try{drawScreen()}catch(err){
+    console.error(err);
+    if(S.step!=="app"||render.recovering)throw err;
+    render.recovering=true;S.rankFor=null;S.squadId=null;S.tab="home";sheet=null;lockOpen=false;
+    try{drawScreen()}finally{render.recovering=false}
+    note("Something went wrong","DubsDay went back to Home. Please try that again.");
+  }
+}
+function drawScreen(){
   const app=document.getElementById("app"),sh=document.querySelector(".sheet"),st=sh?sh.scrollTop:0;let h;
   const ow=document.querySelector(".schedwrap"),ok=ow?ow.dataset.k:"",ot=ow?ow.scrollTop:0;
   if(S.step==="loading")h=`<div class="wordmark">Dubs<b>Day</b></div><p class="muted">Loading…</p>`;else if(S.step==="intro")h=vIntro();else if(S.step==="start")h=vStart();else if(S.step==="signin")h=vSignin();else if(S.step==="signup")h=vSignup();else if(S.step==="friends")h=vOnFriends();else if(S.step==="squad")h=vOnSquad();
