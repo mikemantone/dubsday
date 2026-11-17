@@ -88,7 +88,7 @@ select.gsel{flex:1;min-width:0;padding:6px 38px 6px 10px;text-overflow:ellipsis;
 
 /* intro */
 .wordmark{font-family:var(--display);font-weight:900;font-stretch:150%;font-size:20px;letter-spacing:-.02em}
-.wordmark b{color:var(--full-hot)}
+.wordmark b,.wm-day{color:var(--full-hot)}
 .hero h1{font-size:46px;font-stretch:140%;font-weight:900}
 .mini{padding:4px 15px 12px;border-radius:16px;background:var(--panel);border:1px solid var(--line)}
 .mini .sched .head{margin-bottom:0;box-shadow:none;position:static;background:transparent;height:auto;border-bottom:0;padding:8px 0 10px}
@@ -436,7 +436,7 @@ function vSignup(){
   ${S.hasSession?"":`<div class="field"><label for="suPass">Password</label><input type="password" id="suPass" autocomplete="new-password"><span class="muted small">At least 8 characters. Keep it somewhere safe; it can't be recovered automatically.</span></div>`}
   <div class="field"><label for="suTz">Time zone</label>${tzSelect("suTz",S.draftTz||DEVICE_TZ||"America/New_York")}<span class="muted small">Set from your device. Your schedule and DubTimes show in this time zone. You can change it later in Profile.</span></div>
   ${formErr?`<p class="err">${esc(formErr)}</p>`:""}
-  <button class="btn primary block" data-a="signup">Create profile</button>${S.hasSession?`<button class="btn ghost block" data-a="signOut">Use a different account</button>`:`<button class="btn ghost block" data-a="toStart">Back</button>`}`;
+  <button class="btn primary block" data-a="signup">Create profile</button>${S.hasSession?`<button class="btn ghost block" data-a="signOut">Use a different account</button>`:`<button class="btn ghost block" data-a="${GOOGLE_SIGNIN?"toStart":"toIntro"}">Back</button>`}`;
 }
 function vRank(){
   const q=squad(S.rankFor),many=mySquads().length>1;
@@ -473,7 +473,7 @@ function vHome(){
     hero=`<div class="stack"><p class="muted">${ms>0?`Next up in ${h>=24?Math.floor(h/24)+"d "+(h%24)+"h":h+"h "+m+"m"}`:"Happening now"}</p>${blockCard(next,{day:true,squad:true,open:true})}</div>`}
   else hero=`<div class="panel stack"><p>${qs.length?"Your time is in. Nothing overlaps with your squad yet, and you will get a notification when it does.":"Join a squad to see when everyone can play."}</p>${qs.length?"":`<button class="btn primary" data-a="tab" data-id="squads">Create or join a squad</button>`}</div>`;
   const rest=mb.slice(1,6);
-  return `<div class="row"><div class="grow"><p class="muted small">${esc(dateText(0,{weekday:"long",month:"long",day:"numeric"}))}</p><h1>${today?"It's DubsDay, "+esc(S.me.name)+".":"Who's ready for dubs?"}</h1></div></div>
+  return `<div class="row"><div class="grow"><p class="muted small">${esc(dateText(0,{weekday:"long",month:"long",day:"numeric"}))}</p><h1>${today?"It's Dubs<span class=\"wm-day\">Day</span>, "+esc(S.me.name)+".":"Who's ready for dubs?"}</h1></div></div>
   ${DEVICE_TZ&&!sameZone(DEVICE_TZ,TZ)&&prefs.get("tzkeep")!==DEVICE_TZ+"|"+TZ?`<div class="panel stack"><div><strong>Your phone is on ${esc(tzName(DEVICE_TZ))}</strong><p class="muted small">DubsDay is showing ${esc(tzName(TZ))}. Switch so your schedule matches your clock?</p></div><div class="row wrap"><button class="btn sm primary" data-a="useDeviceTz">Use ${esc(tzName(DEVICE_TZ))}</button><button class="btn sm ghost" data-a="keepTz">Keep ${esc(tzName(TZ))}</button></div></div>`:""}
   ${inv}${cfh}${hero}
   ${(need?mb:rest).length?`<div class="stack"><h3>Coming up</h3>${(need?mb.slice(0,5):rest).map(b=>blockCard(b,{day:true,squad:true,open:true})).join("")}</div>`:""}
