@@ -113,6 +113,16 @@ select.gsel{flex:1;min-width:0;padding:6px 38px 6px 10px;text-overflow:ellipsis;
 .block.dub{border-color:color-mix(in srgb,var(--dub) 55%,var(--line))}
 .block .tier{font-family:var(--display);font-weight:800;font-stretch:120%;font-size:15px}
 .block.dub .tier{color:var(--dub)}
+.block.tap{cursor:pointer}
+.chev{font-size:15px;opacity:.75;margin-left:8px}
+.exp{display:flex;flex-direction:column;gap:12px;border-top:1px solid rgba(255,255,255,.12);padding-top:12px;margin-top:4px;cursor:auto}
+.roster{display:flex;flex-direction:column;gap:6px}
+.rr{display:flex;align-items:center;gap:8px;font-size:14px}
+.rr .nm{font-weight:600;min-width:62px}
+.rr .when2{color:var(--muted)}
+.block.full .rr .when2{color:#d6e4ff}
+.pk{display:flex;flex-direction:column;gap:6px;font-size:14px}
+.pkh{font-weight:700;font-size:13px}
 .block .when{font-family:var(--display);font-weight:800;font-size:22px;font-stretch:110%;font-variant-numeric:tabular-nums}
 .block.full{background:linear-gradient(135deg,#1b3fb3,var(--full) 55%,#5a93ff);border-color:var(--full-hot);box-shadow:0 0 0 1px rgba(141,184,255,.4),0 8px 34px rgba(43,107,255,.55);position:relative;overflow:hidden;color:#fff}
 .block.full .tier{font-size:24px;font-stretch:150%;font-weight:900;line-height:1}
@@ -245,7 +255,7 @@ const GOOGLE_SIGNIN=false; /* turn on once a Google sign-in client is set up in 
 const LOGIN_DOMAIN="users.dubsday.vercel.app"; /* accounts get a meaningless login here; no email is collected or sent */
 const GAME_IDEAS=["Apex Legends","Battlefield 6","Call of Duty: Warzone","Enshrouded","Fortnite","Gears of War: E-Day","Halo Infinite","Helldivers 2","Minecraft","Monster Hunter Wilds","Overwatch 2","Rocket League","Sid Meier's Civilization VII","V Rising","Valheim"];
 function fresh(){return {step:"loading",tab:"home",squadId:null,dayOff:0,me:null,squads:[],invites:[],friends:[],reqIn:[],reqOut:[],avail:{me:[]},commits:[],rank:{},
-  notif:{found:true,warn:true,live:true},hasSession:false,google:false,email:"",linkInvite:null,searchQ:"",searchRes:[],sqLinks:{}}}
+  notif:{found:true,warn:true,live:true},hasSession:false,google:false,email:"",linkInvite:null,searchQ:"",searchRes:[],sqLinks:{},open:new Set()}}
 let S=fresh();
 const prefs={get(k){try{return localStorage.getItem("dubsday-"+k)}catch(e){return null}},set(k,v){try{v==null?localStorage.removeItem("dubsday-"+k):localStorage.setItem("dubsday-"+k,v)}catch(e){}}};
 function persist(){}
@@ -343,9 +353,22 @@ function pickGame(q,members){
   }
   return {game:null,rounds,skipped:[...blocked]};
 }
+/* back-to-back stretches with the same winning game become one DubTime (one card) */
+function sessions(q,off){
+  const out=[];
+  for(const b of blocks(q,off)){
+    b.game=pickGame(q,b.members).game;
+    const last=out[out.length-1];
+    if(last&&last.b===b.a&&last.game===b.game){last.b=b.b;last.segs.push(b);if(b.tier!=="full")last.tier="dub"}
+    else out.push({squad:q.id,off,day:b.day,a:b.a,b:b.b,game:b.game,tier:b.tier,segs:[b]});
+  }
+  out.forEach(x=>{x.members=[...new Set(x.segs.flatMap(g=>g.members))];x.id=[x.squad,x.day,x.a,x.game].join("|")});
+  return out;
+}
+function runsIn(m,segs){const r=[];for(const g of segs)if(g.members.includes(m)){const l=r[r.length-1];if(l&&l[1]===g.a)l[1]=g.b;else r.push([g.a,g.b])}return r}
 function myBlocks(){
   const out=[],ns=nowSlot();
-  mySquads().forEach(q=>{for(let o=0;o<7;o++)blocks(q,o).forEach(b=>{if(b.members.includes("me")&&!(o===0&&b.b<=ns))out.push(b)})});
+  mySquads().forEach(q=>{for(let o=0;o<7;o++)sessions(q,o).forEach(b=>{if(b.members.includes("me")&&!(o===0&&b.b<=ns))out.push(b)})});
   return out.sort((x,y)=>x.off-y.off||x.a-y.a);
 }
 /* times where I am part of a DubTime in more than one squad */
@@ -365,33 +388,24 @@ const blockId=b=>[b.squad,b.day,b.a,b.b,b.key].join("|");
 /* ---------- pieces ---------- */
 function whenText(b){return dayLabel(b.off)+", "+range(b.a,b.b)}
 function blockCard(b,opts={}){
-  const q=squad(b.squad),g=pickGame(q,b.members),ns=nowSlot(),live=b.off===0&&b.a<=ns&&ns<b.b;
-  const names=b.members.map(m=>m==="me"?"You":person(m).name).join(", ");
+  const q=squad(b.squad),ns=nowSlot(),live=b.off===0&&b.a<=ns&&ns<b.b,open=S.open.has(b.id);
   const tier=b.tier==="full"?"Full-Squad DubTime":"DubTime";
-  const why=g.rounds.length?`<details class="why"><summary>How the game was picked</summary>${g.rounds.map((r,ri)=>`<div class="rnd">${g.rounds.length>1?`<span class="small" style="opacity:.8">${ri===0?"First choices":"After the least popular game dropped out"}</span>`:""}${r.map(x=>`<div class="row" style="gap:8px"><span class="row" style="gap:3px">${x.voters.map(v=>avatar(v).replace('class="av ','class="av xs ')).join("")}</span><span>${esc(x.game)}</span></div>`).join("")}</div>`).join("")}</details>`:"";
-  return `<div class="block ${b.tier}">
-    <div class="row"><span class="tier grow">${tier}</span>${live?'<span class="live">Live now</span>':""}</div>
+  let body="";
+  if(open){
+    const order=["me",...b.members.filter(m=>m!=="me")].filter(m=>b.members.includes(m)).sort((x,y)=>(x==="me"?-1:y==="me"?1:runsIn(x,b.segs)[0][0]-runsIn(y,b.segs)[0][0]));
+    const roster=order.map(m=>{const r=runsIn(m,b.segs),s0=r[0][0],e0=r[r.length-1][1];
+      const w=s0===b.a&&e0===b.b?"whole time":s0===b.a?"leaves "+tl(e0):e0===b.b?"joins "+tl(s0):tl(s0)+" to "+tl(e0);
+      return `<div class="rr">${avatar(m).replace('class="av ','class="av xs ')}<span class="nm">${m==="me"?"You":esc(person(m).name)}</span><span class="when2">${w}</span></div>`}).join("");
+    const rep=b.segs.reduce((x,y)=>y.members.length>x.members.length?y:x,b.segs[0]),g=pickGame(q,rep.members),first=g.rounds[0]||[];
+    const picks=first.length?`<div class="pk"><div class="pkh">How the game was picked</div>${first.map(x=>`<div class="row" style="gap:8px"><span class="row" style="gap:3px">${x.voters.map(v=>avatar(v).replace('class="av ','class="av xs ')).join("")}</span><span>${esc(x.game)}</span></div>`).join("")}</div>`:"";
+    body=`<div class="exp"><div class="roster">${roster}</div>${picks}${opts.open?`<button class="btn sm ${b.tier==="full"?"":"ghost"}" data-a="openSquad" data-id="${q.id}" data-off="${b.off}" style="align-self:flex-start;${b.tier==="full"?"background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.5)":""}">Open ${esc(q.name)} schedule</button>`:""}</div>`;
+  }
+  return `<div class="block ${b.tier} tap" data-a="toggleCard" data-id="${esc(b.id)}" role="button" tabindex="0" aria-expanded="${open}">
+    <div class="row"><span class="tier grow">${tier}</span>${live?'<span class="live">Live now</span>':""}<span class="chev" aria-hidden="true">${open?"▴":"▾"}</span></div>
     <div class="when">${opts.day?esc(dayLabel(b.off))+" ":""}${range(b.a,b.b)}</div>
-    <div class="muted small">${opts.squad?esc(q.name)+" with ":""}${esc(names)} (${durLabel(b.b-b.a)})</div>
-    <div>${g.game?`Play <strong>${esc(g.game)}</strong> <span class="muted small">${g.votes} of ${g.of} top picks</span>`:'<span class="muted">No ranked game fits this head count yet</span>'}</div>
-    ${why}
-    ${opts.open?`<button class="btn sm ${b.tier==="full"?"":"ghost"}" data-a="openSquad" data-id="${q.id}" data-off="${b.off}" style="align-self:flex-start;${b.tier==="full"?"background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.5)":""}">Open ${esc(q.name)} schedule</button>`:""}
-  </div>`;
-}
-function gamesEditor(){
-  const list=S.rankDraft;
-  return `<div class="stack">
-    ${list.map((g,i)=>`<div class="panel row" style="padding:12px">
-      <span class="rank">${i+1}</span>
-      <div class="grow stack" style="gap:8px"><strong>${esc(g.name)}</strong>
-      <div class="row"><select class="gsel" id="need-${i}" data-change="need" data-i="${i}" aria-label="Players needed for ${esc(g.name)}">
-        <option value="2"${g.need==="2"?" selected":""}>2+ players</option><option value="3"${g.need==="3"?" selected":""}>3+ players</option><option value="full"${g.need==="full"?" selected":""}>Full squad only</option></select>
-      <button class="icon" data-a="gameUp" data-i="${i}" aria-label="Move ${esc(g.name)} up" ${i===0?"disabled":""}>↑</button>
-      <button class="icon" data-a="gameDown" data-i="${i}" aria-label="Move ${esc(g.name)} down" ${i===list.length-1?"disabled":""}>↓</button>
-      <button class="icon" data-a="gameDel" data-i="${i}" aria-label="Remove ${esc(g.name)}">✕</button></div></div></div>`).join("")}
-    ${list.length<5?`<select class="gsel" id="newGameSel" data-change="addGame" aria-label="Add a game" style="flex:none;width:100%;min-height:46px;font-size:16px"><option value="">Add a game</option>${GAME_IDEAS.filter(n=>!list.some(g=>g.name===n)).map(n=>`<option>${esc(n)}</option>`).join("")}<option value="__other">Something else…</option></select>
-    ${S.addOther?`<div class="row"><input type="text" id="newGame" placeholder="Game title" aria-label="Game title"><button class="btn" data-a="gameAdd">Add</button></div>`:""}`:`<p class="muted small">Five games is the limit. Remove one to add another.</p>`}
-    <p class="muted small">Rank 1 is your top pick. A game set to full squad only is skipped whenever someone is missing.</p>
+    ${opts.squad?`<div class="muted small">${esc(q.name)}</div>`:""}
+    <div>${b.game?`Play <strong>${esc(b.game)}</strong>`:'<span class="muted">No ranked game fits this head count yet</span>'}</div>
+    ${body}
   </div>`;
 }
 
@@ -489,14 +503,14 @@ function vHome(){
 function vSquads(){
   const qs=mySquads();
   return `<h1>Squads</h1>
-  ${qs.length?qs.map(q=>{const b=blocks(q,0).concat(blocks(q,1)).find(x=>!(x.off===0&&x.b<=nowSlot()));return `<button class="panel row" style="text-align:left;width:100%" data-a="openSquad" data-id="${q.id}" data-off="0"><span class="grow"><strong>${esc(q.name)}</strong><br><span class="muted small">${q.members.map(m=>m==="me"?"You":person(m).name).join(", ")}</span>${b?`<br><span class="small"><i class="dot ${b.tier}"></i> ${esc(whenText(b))}</span>`:""}</span><span aria-hidden="true">›</span></button>`}).join(""):`<p class="muted">You are not in a squad yet. Accept an invite, enter a code, or start one.</p>`}
+  ${qs.length?qs.map(q=>{const b=sessions(q,0).concat(sessions(q,1)).find(x=>!(x.off===0&&x.b<=nowSlot()));return `<button class="panel row" style="text-align:left;width:100%" data-a="openSquad" data-id="${q.id}" data-off="0"><span class="grow"><strong>${esc(q.name)}</strong><br><span class="muted small">${q.members.map(m=>m==="me"?"You":person(m).name).join(", ")}</span>${b?`<br><span class="small"><i class="dot ${b.tier}"></i> ${esc(whenText(b))}</span>`:""}</span><span aria-hidden="true">›</span></button>`}).join(""):`<p class="muted">You are not in a squad yet. Accept an invite, enter a code, or start one.</p>`}
   <div class="panel stack"><h3>Join with a squad code</h3><div class="row"><input type="text" id="joinCode" placeholder="Squad code" autocapitalize="characters" aria-label="Squad code"><button class="btn" data-a="join">Join</button></div>${formErr?`<p class="err">${esc(formErr)}</p>`:""}<p class="muted small">Squads never show up in search. Ask a squad member for the code.</p></div>
   <div class="panel stack"><h3>Start a squad</h3><div class="row"><input type="text" id="newSquad" placeholder="Squad name" maxlength="24" aria-label="Squad name"><button class="btn" data-a="createSquad">Create</button></div></div>`;
 }
 function vSquad(){
   const q=squad(S.squadId),off=S.dayOff,day=dayKey(off),n=q.members.length,ns=off===0?nowSlot():-1;
   const order=["me",...q.members.filter(m=>m!=="me")].filter(m=>q.members.includes(m));
-  const bl=blocks(q,off);
+  const bl=blocks(q,off),cards=sessions(q,off);
   let first=clamp(ns-2,0,SLOTS-1);
   if(off!==0){let e=SLOTS;order.forEach(m=>{for(let x=0;x<e;x++)if(isAvail(m,q.id,day,x)){e=x;break}});if(e===SLOTS)e=sl(12)+2;first=Math.max(0,e-2)}
   const top=first;
@@ -522,7 +536,7 @@ function vSquad(){
   ${mineG.length?"":`<div class="panel stack" style="border-color:var(--full-hot)"><div><strong>Rank your games for this squad</strong><p class="muted small">Your picks count toward what ${esc(q.name)} plays each DubTime.</p></div><button class="btn primary" data-a="rank" data-id="${q.id}">Rank your game preferences</button></div>`}
   <div class="chips" role="tablist">${[0,1,2,3,4,5,6].map(o=>`<button class="chip ${o===off?"on":""}" data-a="day" data-off="${o}">${esc(dayLabel(o))}</button>`).join("")}</div>
   <button class="btn cta block" data-a="openSheet">Set dub availability</button>
-  ${bl.length?`<div class="stack">${bl.map(b=>blockCard(b)).join("")}</div>`:`<p class="muted">No overlap on this dub day yet.</p>`}
+  ${cards.length?`<div class="stack">${cards.map(b=>blockCard(b)).join("")}</div>`:`<p class="muted">No overlap on this dub day yet.</p>`}
   <div class="legend"><span><i class="dot solo"></i>No overlap</span><span><i class="dot dub"></i>DubTime</span><span><i class="dot full"></i>Full-Squad DubTime</span></div>
   <div class="schedwrap" data-k="${q.id}|${off}" data-top="${top-first}"><div class="sched" style="grid-template-columns:${cols}">${h}</div></div>
   <p class="muted small">${off===0?"Starts an hour before now and runs":"Runs"} to the end of the dub day at 4:00am. Times are in ${esc(tzName(TZ))}.</p>
@@ -724,6 +738,7 @@ const A={
       if(!data.session){formErr="Sign-up is not fully set up yet. Ask Mike to turn off email confirmation in Supabase.";return}
       S.hasSession=true;S.email=login;S.google=false;draftPass=""}
     await rpc("create_profile",{p_first_name:n,p_gamertag:u,p_tz:S.draftTz||"America/New_York"});await sync();await friendLink();S.step="friends"},
+  toggleCard(d){S.open.has(d.id)?S.open.delete(d.id):S.open.add(d.id)},
   askRemove(d){S.confirmRemove=d.id},cancelRemove(){S.confirmRemove=null},
   async removeMember(d){const q=squad(S.squadId),nm=person(d.id).name;await rpc("remove_member",{sid:S.squadId,member:d.id});S.confirmRemove=null;await sync();note(nm+" removed","They are no longer in "+q.name+".")},
   askDelete(){S.confirmDelete=true;setTimeout(()=>scrollTo({top:document.body.scrollHeight,behavior:"smooth"}),0)},cancelDelete(){S.confirmDelete=false},
@@ -817,13 +832,13 @@ document.addEventListener("input",e=>{if(e.target.id!=="fq")return;S.searchQ=e.t
   searchTimer=setTimeout(async()=>{const q=S.searchQ;try{const res=await rpc("search_gamertags",{q});if(q!==S.searchQ)return;S.searchRes=res||[]}catch(err){S.searchRes=[]}
     const box=document.getElementById("fres");if(box)box.innerHTML=friendResults()},250)});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&(sheet||lockOpen)){sheet=null;lockOpen=false;render()}
+  if((e.key==="Enter"||e.key===" ")&&e.target.dataset&&e.target.dataset.a==="toggleCard"){e.preventDefault();run("toggleCard",e.target.dataset,e.target);return}
   if(e.key==="Enter"&&e.target.tagName==="INPUT"){const m={suName:"signup",suUser:"signup",joinCode:"join",newSquad:"createSquad",newGame:"gameAdd",siTag:"signinEmail",siPass:"signinEmail",suPass:"signup",pfTag:"saveTag",pfNew:"savePw"}[e.target.id];if(m)run(m,{})}});
 /* keep the schedule fresh while the app is open */
 async function refresh(){
   if(S.step!=="app"||document.hidden||busy||sheet||S.rankFor)return;
   try{await sync()}catch(e){return}
   const ae=document.activeElement;if(ae&&/INPUT|SELECT|TEXTAREA/.test(ae.tagName))return;
-  if(document.querySelector("details[open]"))return;
   render();
 }
 setInterval(refresh,20000);
