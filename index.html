@@ -61,6 +61,7 @@ p{margin:0}
 .btn.google{background:var(--text);color:var(--ink);border-color:var(--text)}
 .btn.create{background:var(--solo);color:var(--ink);border-color:var(--solo)}
 .btn.signin{background:var(--dub);color:var(--ink);border-color:var(--dub)}
+.btn.danger{background:var(--danger);color:#fff;border-color:var(--danger)}
 .btn.cta{background:var(--cta);color:var(--ink);border-color:var(--cta)}
 .btn.blue{background:var(--full);border-color:var(--full);color:#fff}
 .btn.ghost{background:transparent}
@@ -565,7 +566,9 @@ function vProfile(){
     <button class="btn" data-a="lock">Preview on a lock screen</button>
     <p class="note">The always-on lock screen countdown needs the iPhone app, planned as the next phase.</p></div>
   <p class="muted small">Signed in as @${esc(S.me.username)}</p>
-  <button class="btn ghost" data-a="signOut">Sign out</button>`;
+  <button class="btn ghost" data-a="signOut">Sign out</button>
+  ${S.confirmDelete?`<div class="panel stack" style="border-color:var(--danger)"><strong>Delete your profile?</strong><p class="muted small">This permanently deletes your account, schedule, game rankings and friends list, and removes you from your squads. It can't be undone. Your gamertag becomes available again right away.</p>
+    <div class="row wrap"><button class="btn sm danger" data-a="deleteAccount">Delete my profile</button><button class="btn sm ghost" data-a="cancelDelete">Cancel</button></div></div>`:`<button class="btn ghost" data-a="askDelete" style="color:var(--danger)">Delete profile</button>`}`;
 }
 function vLock(){
   const b=myBlocks()[0],q=b?squad(b.squad):(S.squads[0]||{name:"Your squad"});
@@ -716,6 +719,12 @@ const A={
       if(!data.session){formErr="Sign-up is not fully set up yet. Ask Mike to turn off email confirmation in Supabase.";return}
       S.hasSession=true;S.email=login;S.google=false;draftPass=""}
     await rpc("create_profile",{p_first_name:n,p_gamertag:u,p_tz:S.draftTz||"America/New_York"});await sync();await friendLink();S.step="friends"},
+  askDelete(){S.confirmDelete=true;setTimeout(()=>scrollTo({top:document.body.scrollHeight,behavior:"smooth"}),0)},cancelDelete(){S.confirmDelete=false},
+  async deleteAccount(){
+    try{if("serviceWorker" in navigator){const reg=await navigator.serviceWorker.getRegistration();const sub=reg&&await reg.pushManager.getSubscription();if(sub)await sub.unsubscribe()}}catch(e){}
+    await rpc("delete_account");
+    prefs.set("push",null);try{await sb.auth.signOut({scope:"local"})}catch(e){}
+    USERS={};ME=null;S=fresh();S.step="intro";sheet=null;note("Profile deleted","Your account and its data are gone.")},
   async signOut(){try{if("serviceWorker" in navigator){const reg=await navigator.serviceWorker.getRegistration();const sub=reg&&await reg.pushManager.getSubscription();if(sub){await rpc("delete_push_sub",{p_endpoint:sub.endpoint}).catch(()=>{});await sub.unsubscribe()}}}catch(e){}
     prefs.set("push",null);await sb.auth.signOut();USERS={};ME=null;S=fresh();S.step="intro";sheet=null},
   async saveTag(){const u=val("pfTag").trim().toLowerCase().replace(/^@/,"");errAt="tag";
@@ -751,7 +760,7 @@ const A={
   gameUp(d){const l=S.rankDraft,i=+d.i;[l[i-1],l[i]]=[l[i],l[i-1]]},gameDown(d){const l=S.rankDraft,i=+d.i;[l[i+1],l[i]]=[l[i],l[i+1]]},
   gameDel(d){S.rankDraft.splice(+d.i,1)},
   gameAdd(){const v=val("newGame").trim().slice(0,60);if(v&&S.rankDraft.length<5&&!S.rankDraft.some(g=>g.name.toLowerCase()===v.toLowerCase()))S.rankDraft.push({name:v,need:"2"});S.addOther=false},
-  tab(d){S.tab=d.id;S.squadId=null;S.rankFor=null;S.searchQ="";S.searchRes=[]},
+  tab(d){S.tab=d.id;S.squadId=null;S.rankFor=null;S.confirmDelete=false;S.searchQ="";S.searchRes=[]},
   openSquad(d){S.rankFor=null;S.tab="squads";S.squadId=d.id;S.dayOff=+d.off||0;scrollTo(0,0)},backSquads(){S.squadId=null},
   day(d){S.dayOff=+d.off},
   async acceptInvite(d){await withAlerts(()=>rpc("respond_squad_invitation",{sid:d.id,accept:true}));afterJoin(d.id)},
