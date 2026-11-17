@@ -255,7 +255,7 @@ function applyState(st){
   USERS={};for(const k in st.people)USERS[k]=st.people[k];
   st.req_in.concat(st.req_out).forEach(r=>{if(!USERS[r.id])USERS[r.id]={name:null,u:r.u}});
   S.friends=st.friends;S.reqIn=st.req_in.map(r=>r.id);S.reqOut=st.req_out.map(r=>r.id);
-  S.squads=st.squads.map(q=>({id:q.id,name:q.name,code:q.code,token:q.invite_token,members:(q.members||[]).map(id)}));
+  S.squads=st.squads.map(q=>({id:q.id,name:q.name,code:q.code,token:q.invite_token,owner:q.owner?id(q.owner):null,members:(q.members||[]).map(id)}));
   S.invites=st.invites;
   S.rank={};st.rankings.forEach(r=>{(S.rank[r.squad]=S.rank[r.squad]||{})[id(r.uid)]=r.games});
   S.avail={me:[]};st.avail.forEach(w=>{const u=id(w.uid);(S.avail[u]=S.avail[u]||[]).push({id:w.id,day:w.day,a:w.a,b:w.b,repeat:w.repeat,tz:w.tz||"America/New_York",squads:w.squads===null?"all":w.squads})});
@@ -266,7 +266,7 @@ function applyState(st){
 async function sync(){applyState(await rpc("get_state"))}
 const ERR={gamertag_taken:"That gamertag is taken. Try another.",bad_gamertag:"Gamertags are 3 to 20 letters, numbers or underscores.",bad_name:"Use a name of 20 characters or fewer.",
   no_squad:"No squad uses that code. Check it with whoever invited you.",squad_full:"That squad is full.",not_friends:"You can only invite people on your friends list.",
-  too_many_squads:"You are in the maximum number of squads.",not_signed_in:"Your session ended. Sign in again.",no_profile:"Finish creating your profile first.",bad_day:"That day is too far away.",bad_tz:"That time zone is not supported. Pick another one."};
+  too_many_squads:"You are in the maximum number of squads.",not_signed_in:"Your session ended. Sign in again.",no_profile:"Finish creating your profile first.",bad_day:"That day is too far away.",bad_tz:"That time zone is not supported. Pick another one.",not_owner:"Only the squad owner can remove members."};
 function errText(e){const m=(e&&e.message)||String(e);for(const k in ERR)if(m.includes(k))return ERR[k];
   if(/Invalid login credentials/i.test(m))return "That gamertag and password do not match an account.";
   if(/not authorized|not confirmed|confirmation/i.test(m))return "Sign-up is not fully set up yet. Ask Mike to turn off email confirmation in Supabase.";
@@ -479,7 +479,7 @@ function vHome(){
   ${inv}${cfh}${hero}
   ${(need?mb:rest).length?`<div class="stack"><h3>Coming up</h3>${(need?mb.slice(0,5):rest).map(b=>blockCard(b,{day:true,squad:true,open:true})).join("")}</div>`:""}
   ${!need&&qs.length?`<button class="btn cta block" data-a="openSheet">Set dub availability</button>`:""}
-  ${installed()||prefs.get("a2hs")?"":`<div class="panel stack"><div class="row"><span class="appicon">W</span><div class="grow"><strong>Add DubsDay to your Home Screen</strong><div class="muted small">It opens like an app, and on iPhone it is what lets DubsDay send you notifications.</div></div></div>
+  ${installed()||prefs.get("a2hs")?"":`<div class="panel stack"><div class="row"><span class="appicon" aria-hidden="true"></span><div class="grow"><strong>Add DubsDay to your Home Screen</strong><div class="muted small">It opens like an app, and on iPhone it is what lets DubsDay send you notifications.</div></div></div>
     <ol class="steps"><li><span>Open DubsDay in Safari and tap the Share button.</span></li><li><span>Choose Add to Home Screen.</span></li><li><span>Open DubsDay from the new icon and allow notifications.</span></li></ol>
     <button class="btn sm ghost" data-a="a2hsHide" style="align-self:flex-start">Not now</button></div>`}`;
 }
@@ -525,7 +525,9 @@ function vSquad(){
   <p class="muted small">${off===0?"Starts an hour before now and runs":"Runs"} to the end of the dub day at 4:00am. Times are in ${esc(tzName(TZ))}.</p>
   ${mineG.length?`<div class="panel stack"><div class="row"><h3 class="grow">Your game rankings here</h3><button class="btn sm" data-a="rank" data-id="${q.id}">Edit</button></div>${mineG.map((g,i)=>`<div class="row"><span class="rank">${i+1}</span><span class="grow">${esc(g.name)}</span><span class="muted small">${g.need==="full"?"Full squad only":g.need+"+ players"}</span></div>`).join("")}</div>`:""}
   <div class="panel stack"><h3>Members</h3>
-    ${order.map(m=>`<div class="row">${avatar(m)}<div class="grow"><strong>${m==="me"?"You":esc(person(m).name)}</strong><div class="muted small">@${esc(person(m).u)}</div></div></div>`).join("")}
+    ${order.map(m=>`<div class="row">${avatar(m)}<div class="grow"><strong>${m==="me"?"You":esc(person(m).name)}</strong><div class="muted small">@${esc(person(m).u)}${q.owner===m?", squad owner":""}</div></div>${q.owner==="me"&&m!=="me"&&S.confirmRemove!==m?`<button class="btn sm ghost" data-a="askRemove" data-id="${m}" style="color:var(--danger)">Remove</button>`:""}</div>
+      ${S.confirmRemove===m?`<div class="panel stack" style="border-color:var(--danger)"><strong>Remove ${esc(person(m).name)} from ${esc(q.name)}?</strong><p class="muted small">They will no longer see this squad or its schedule, and their game rankings for it are deleted. They can only rejoin with the squad code or an invite link.</p>
+      <div class="row wrap"><button class="btn sm danger" data-a="removeMember" data-id="${m}">Remove from squad</button><button class="btn sm ghost" data-a="cancelRemove">Cancel</button></div></div>`:""}`).join("")}
     <div class="row wrap"><span class="grow">Squad code <strong>${esc(q.code)}</strong></span><button class="btn sm" data-a="copy" data-t="${esc(q.code)}">Copy code</button></div>
     ${S.sqLinks&&S.sqLinks[q.id]?`<div class="row wrap"><span class="grow" style="word-break:break-all">${esc(S.sqLinks[q.id])}</span><button class="btn sm" data-a="copy" data-t="${esc(S.sqLinks[q.id])}">Copy link</button></div><p class="muted small">Whoever opens this link is asked to join this squad once they sign in.</p>`:`<button class="btn sm" data-a="sqLink" style="align-self:flex-start">Create squad invite link</button>`}
     ${nonFriends.length?`<div class="stack"><p class="muted small">Invite a friend</p>${nonFriends.map(f=>`<div class="row">${avatar(f)}<span class="grow">${esc(person(f).name)}</span><button class="btn sm" data-a="inviteFriend" data-id="${f}">Invite</button></div>`).join("")}</div>`:""}
@@ -576,12 +578,12 @@ function vLock(){
   const title=full?"Full-Squad DubTime":"DubTime",d=new Date();
   return `<div class="lock"><div class="in">
     <div class="clock">${tl(a).replace(/[ap]m/,"")}</div><div class="date">${esc(dateText(0,{weekday:"long",month:"long",day:"numeric"}))}</div>
-    <div class="la"><div class="row"><span class="appicon">W</span><div class="grow"><strong>${title} is live</strong><div class="muted small">${esc(q.name)}${g?", "+esc(g):""}</div></div></div>
+    <div class="la"><div class="row"><span class="appicon" aria-hidden="true"></span><div class="grow"><strong>${title} is live</strong><div class="muted small">${esc(q.name)}${g?", "+esc(g):""}</div></div></div>
       <div class="row" style="align-items:flex-end"><div class="grow"><div class="muted small">Time remaining</div><div class="rem">${durLabel(e-a)||"0m"}</div></div><div class="muted small" style="text-align:right">${range(a,e)}</div></div>
       <div class="bar"><i style="width:6%"></i></div></div>
     <p class="muted small" style="text-align:center">Stays on the lock screen until DubTime ends (iPhone app phase)</p>
-    <div class="push" style="animation:none"><span class="appicon">W</span><div><b>${title} in 15 minutes</b><span>${esc(q.name)} starts at ${tl(a)}. ${g?"Tonight's pick: "+esc(g)+".":""}</span></div></div>
-    <div class="push" style="animation:none"><span class="appicon">W</span><div><b>${title} found</b><span>${esc(q.name)}: everyone${full?"":" available"} overlaps ${range(a,e)}.</span></div></div>
+    <div class="push" style="animation:none"><span class="appicon" aria-hidden="true"></span><div><b>${title} in 15 minutes</b><span>${esc(q.name)} starts at ${tl(a)}. ${g?"Tonight's pick: "+esc(g)+".":""}</span></div></div>
+    <div class="push" style="animation:none"><span class="appicon" aria-hidden="true"></span><div><b>${title} found</b><span>${esc(q.name)}: everyone${full?"":" available"} overlaps ${range(a,e)}.</span></div></div>
     <button class="btn block" data-a="unlock" style="margin-top:14px">Close preview</button></div></div>`;
 }
 const REP={none:"Just this day",daily:"Every day",weekly:""};
@@ -719,6 +721,8 @@ const A={
       if(!data.session){formErr="Sign-up is not fully set up yet. Ask Mike to turn off email confirmation in Supabase.";return}
       S.hasSession=true;S.email=login;S.google=false;draftPass=""}
     await rpc("create_profile",{p_first_name:n,p_gamertag:u,p_tz:S.draftTz||"America/New_York"});await sync();await friendLink();S.step="friends"},
+  askRemove(d){S.confirmRemove=d.id},cancelRemove(){S.confirmRemove=null},
+  async removeMember(d){const q=squad(S.squadId),nm=person(d.id).name;await rpc("remove_member",{sid:S.squadId,member:d.id});S.confirmRemove=null;await sync();note(nm+" removed","They are no longer in "+q.name+".")},
   askDelete(){S.confirmDelete=true;setTimeout(()=>scrollTo({top:document.body.scrollHeight,behavior:"smooth"}),0)},cancelDelete(){S.confirmDelete=false},
   async deleteAccount(){
     try{if("serviceWorker" in navigator){const reg=await navigator.serviceWorker.getRegistration();const sub=reg&&await reg.pushManager.getSubscription();if(sub)await sub.unsubscribe()}}catch(e){}
@@ -760,8 +764,8 @@ const A={
   gameUp(d){const l=S.rankDraft,i=+d.i;[l[i-1],l[i]]=[l[i],l[i-1]]},gameDown(d){const l=S.rankDraft,i=+d.i;[l[i+1],l[i]]=[l[i],l[i+1]]},
   gameDel(d){S.rankDraft.splice(+d.i,1)},
   gameAdd(){const v=val("newGame").trim().slice(0,60);if(v&&S.rankDraft.length<5&&!S.rankDraft.some(g=>g.name.toLowerCase()===v.toLowerCase()))S.rankDraft.push({name:v,need:"2"});S.addOther=false},
-  tab(d){S.tab=d.id;S.squadId=null;S.rankFor=null;S.confirmDelete=false;S.searchQ="";S.searchRes=[]},
-  openSquad(d){S.rankFor=null;S.tab="squads";S.squadId=d.id;S.dayOff=+d.off||0;scrollTo(0,0)},backSquads(){S.squadId=null},
+  tab(d){S.tab=d.id;S.squadId=null;S.rankFor=null;S.confirmDelete=false;S.confirmRemove=null;S.searchQ="";S.searchRes=[]},
+  openSquad(d){S.rankFor=null;S.confirmRemove=null;S.tab="squads";S.squadId=d.id;S.dayOff=+d.off||0;scrollTo(0,0)},backSquads(){S.squadId=null},
   day(d){S.dayOff=+d.off},
   async acceptInvite(d){await withAlerts(()=>rpc("respond_squad_invitation",{sid:d.id,accept:true}));afterJoin(d.id)},
   async declineInvite(d){await rpc("respond_squad_invitation",{sid:d.id,accept:false});await sync()},
