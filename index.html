@@ -237,6 +237,8 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"
 const SB_URL="https://pzwtkdyocvsrqfjvktkl.supabase.co",SB_KEY="sb_publishable_j1hrE2ewjtgNstJWrDUAbg_-FqkXveA";
 const sb=window.__sbMock||supabase.createClient(SB_URL,SB_KEY);
 let USERS={},ME=null;
+const GOOGLE_SIGNIN=false; /* turn on once a Google sign-in client is set up in Supabase */
+const LOGIN_DOMAIN="users.dubsday.vercel.app"; /* accounts get a meaningless login here; no email is collected or sent */
 const GAME_IDEAS=["Apex Legends","Battlefield 6","Call of Duty: Warzone","Enshrouded","Fortnite","Gears of War: E-Day","Halo Infinite","Helldivers 2","Minecraft","Monster Hunter Wilds","Overwatch 2","Rocket League","Sid Meier's Civilization VII","V Rising","Valheim"];
 function fresh(){return {step:"loading",tab:"home",squadId:null,dayOff:0,me:null,squads:[],invites:[],friends:[],reqIn:[],reqOut:[],avail:{me:[]},commits:[],rank:{},
   notif:{found:true,warn:true,live:true},hasSession:false,google:false,email:"",linkInvite:null,searchQ:"",searchRes:[],sqLinks:{}}}
@@ -265,14 +267,14 @@ const ERR={gamertag_taken:"That gamertag is taken. Try another.",bad_gamertag:"G
   no_squad:"No squad uses that code. Check it with whoever invited you.",squad_full:"That squad is full.",not_friends:"You can only invite people on your friends list.",
   too_many_squads:"You are in the maximum number of squads.",not_signed_in:"Your session ended. Sign in again.",no_profile:"Finish creating your profile first.",bad_day:"That day is too far away.",bad_tz:"That time zone is not supported. Pick another one."};
 function errText(e){const m=(e&&e.message)||String(e);for(const k in ERR)if(m.includes(k))return ERR[k];
-  if(/Invalid login credentials/i.test(m))return "That email and password do not match an account.";
-  if(/not authorized|not confirmed|confirmation/i.test(m))return "Email sign-up is not fully set up yet. Ask Mike to turn off email confirmation.";
+  if(/Invalid login credentials/i.test(m))return "That gamertag and password do not match an account.";
+  if(/not authorized|not confirmed|confirmation/i.test(m))return "Sign-up is not fully set up yet. Ask Mike to turn off email confirmation in Supabase.";
   if(/rate limit/i.test(m))return "Too many tries. Wait a minute and try again.";
-  if(/already registered/i.test(m))return "That email already has an account. Sign in instead.";
-  if(/provider is not enabled|Unsupported provider/i.test(m))return "Google sign-in is not set up yet. Use email for now.";
+  if(/already registered/i.test(m))return "That account already exists. Sign in instead.";
+  if(/provider is not enabled|Unsupported provider/i.test(m))return "Google sign-in is not set up yet. Use your gamertag for now.";
   if(/Failed to fetch|NetworkError|Load failed/i.test(m))return "Can't reach DubsDay. Check your connection and try again.";
   return m}
-let sheet=null, lockOpen=false, formErr="", errAt="", raw=0, busy=false;
+let draftPass="", sheet=null, lockOpen=false, formErr="", errAt="", raw=0, busy=false;
 
 const installed=()=>{try{return navigator.standalone===true||matchMedia("(display-mode: standalone)").matches}catch(e){return false}};
 const person=id=>{if(id==="me")return {name:S.me?S.me.name:"You",u:S.me?S.me.username:"you"};const p=USERS[id]||{};return {name:p.name||(p.u?"@"+p.u:"Someone"),u:p.u||"unknown"}};
@@ -408,19 +410,19 @@ function vIntro(){
   <div class="mini" role="img" aria-label="Example schedule: four squad members as columns, with a blue full squad band where all four overlap"><div class="sched" style="grid-template-columns:repeat(4,minmax(0,1fr))">${g}</div></div>
   <div class="legend"><span><i class="dot solo"></i>No overlap</span><span><i class="dot dub"></i>DubTime</span><span><i class="dot full"></i>Full-Squad DubTime</span></div>
   <ol class="steps"><li><span>Create your profile with a first name and gamertag.</span></li><li><span>Add friends, join a squad by invite or code, and rank your games for that squad.</span></li><li><span>Set when you are free. The schedule and the alerts handle the rest.</span></li></ol>
-  <div class="stack"><button class="btn signin block" data-a="toSignin">Sign in</button><button class="btn google block" data-a="google">Continue with Google</button><button class="btn create block" data-a="toStart">Create an account</button>
+  <div class="stack"><button class="btn signin block" data-a="toSignin">Sign in</button>${GOOGLE_SIGNIN?`<button class="btn google block" data-a="google">Continue with Google</button>`:""}<button class="btn create block" data-a="toStart">Create an account</button>
   ${formErr?`<p class="err">${esc(formErr)}</p>`:""}</div>`;
 }
 function vStart(){
   return `<div class="wordmark">Dubs<b>Day</b></div><div class="stack" style="gap:6px"><h2>Create an account</h2><p class="muted">Choose how you want to sign in from now on. Either way, you set your first name and gamertag next.</p></div>
-  <button class="btn google block" data-a="google">Continue with Google</button><button class="btn create block" data-a="emailStart">Create an account with email</button>
+  <button class="btn google block" data-a="google">Continue with Google</button><button class="btn create block" data-a="emailStart">Create an account with a gamertag</button>
   ${formErr?`<p class="err">${esc(formErr)}</p>`:""}
   <p class="muted small">Already have an account?</p><button class="btn signin block" data-a="toSignin">Sign in</button><button class="btn ghost block" data-a="toIntro">Back</button>`;
 }
 function vSignin(){
   return `<div class="wordmark">Dubs<b>Day</b></div><div class="stack" style="gap:6px"><h2>Sign in</h2><p class="muted">Welcome back.</p></div>
-  <button class="btn google block" data-a="google">Continue with Google</button>
-  <div class="field"><label for="siEmail">Email</label><input type="text" id="siEmail" inputmode="email" autocapitalize="off" autocomplete="username" placeholder="you@example.com" value="${esc(S.draftEmail||"")}"></div>
+  ${GOOGLE_SIGNIN?`<button class="btn google block" data-a="google">Continue with Google</button>`:""}
+  <div class="field"><label for="siTag">Gamertag</label><input type="text" id="siTag" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="username" value="${esc(S.draftUser||"")}"></div>
   <div class="field"><label for="siPass">Password</label><input type="password" id="siPass" autocomplete="current-password"></div>
   ${formErr?`<p class="err">${esc(formErr)}</p>`:""}
   <button class="btn signin block" data-a="signinEmail">Sign in</button>
@@ -429,10 +431,9 @@ function vSignin(){
 const stepNote=n=>`<p class="muted small">Step ${n} of 3</p>`;
 function vSignup(){
   return `<div class="wordmark">Dubs<b>Day</b></div><div class="stack" style="gap:6px">${stepNote(1)}<h2>Create your profile</h2>${S.hasSession?'<p class="muted">You are signed in. Add the details your squad will see.</p>':""}</div>
-  ${S.hasSession?"":`<div class="field"><label for="suEmail">Email</label><input type="text" id="suEmail" inputmode="email" autocapitalize="off" placeholder="you@example.com" value="${esc(S.draftEmail||"")}"></div>
-  <div class="field"><label for="suPass">Password</label><input type="password" id="suPass" autocomplete="new-password"><span class="muted small">At least 8 characters.</span></div>`}
   <div class="field"><label for="suName">First name</label><input type="text" id="suName" value="${esc(S.draftName||"")}" maxlength="20"><span class="muted small">This is how you appear in your squads' schedules. Add a last initial if you need one, like Mike M.</span></div>
-  <div class="field"><label for="suUser">Gamertag</label><input type="text" id="suUser" value="${esc(S.draftUser||"")}" maxlength="20" autocapitalize="off"><span class="muted small">Friends search for you by gamertag. Squads are never searchable.</span></div>
+  <div class="field"><label for="suUser">Gamertag</label><input type="text" id="suUser" value="${esc(S.draftUser||"")}" maxlength="20" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="username"><span class="muted small">You sign in with it, and friends search for you by it. Squads are never searchable.</span></div>
+  ${S.hasSession?"":`<div class="field"><label for="suPass">Password</label><input type="password" id="suPass" autocomplete="new-password"><span class="muted small">At least 8 characters. Keep it somewhere safe; it can't be recovered automatically.</span></div>`}
   <div class="field"><label for="suTz">Time zone</label>${tzSelect("suTz",S.draftTz||DEVICE_TZ||"America/New_York")}<span class="muted small">Set from your device. Your schedule and DubTimes show in this time zone. You can change it later in Profile.</span></div>
   ${formErr?`<p class="err">${esc(formErr)}</p>`:""}
   <button class="btn primary block" data-a="signup">Create profile</button>${S.hasSession?`<button class="btn ghost block" data-a="signOut">Use a different account</button>`:`<button class="btn ghost block" data-a="toStart">Back</button>`}`;
@@ -563,7 +564,7 @@ function vProfile(){
     ${t("found","DubTime found","The moment an overlap exists")}${t("warn","15-minute warning","Before each DubTime starts")}${t("live","DubTime is live","When a DubTime starts")}
     <button class="btn" data-a="lock">Preview on a lock screen</button>
     <p class="note">The always-on lock screen countdown needs the iPhone app, planned as the next phase.</p></div>
-  <p class="muted small">Signed in as ${esc(S.email||"your account")}</p>
+  <p class="muted small">Signed in as @${esc(S.me.username)}</p>
   <button class="btn ghost" data-a="signOut">Sign out</button>`;
 }
 function vLock(){
@@ -662,6 +663,7 @@ function render(){
   }
   app.innerHTML=h;persist();
   const nw=document.querySelector(".schedwrap");if(nw)nw.scrollTop=nw.dataset.k===ok?ot:+nw.dataset.top*26;
+  const sp=document.getElementById("suPass");if(sp&&draftPass)sp.value=draftPass;
   const fq=document.getElementById("fq");if(fq){fq.value=S.searchQ;document.getElementById("fres").innerHTML=friendResults()}
   if(sheet){bindDial();const n=document.querySelector(".sheet");if(n)n.scrollTop=st}
 }
@@ -698,20 +700,21 @@ async function friendLink(){
 }
 const A={
   async google(){const {error}=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin}});if(error)throw error;return false},
-  toStart(){S.step="start"},toSignin(){S.step="signin"},emailStart(){S.step="signup"},toIntro(){S.step="intro"},
-  async signinEmail(){const e=val("siEmail").trim(),pw=val("siPass");S.draftEmail=e;
-    if(!/^\S+@\S+\.\S+$/.test(e)){formErr="Enter the email you signed up with.";return}
+  toStart(){S.step=GOOGLE_SIGNIN?"start":"signup"},toSignin(){S.step="signin"},emailStart(){S.step="signup"},toIntro(){S.step="intro"},
+  async signinEmail(){const u=val("siTag").trim().toLowerCase().replace(/^@/,""),pw=val("siPass");S.draftUser=u;
+    if(!u){formErr="Enter your gamertag.";return}
     if(!pw){formErr="Enter your password.";return}
-    const {error}=await sb.auth.signInWithPassword({email:e,password:pw});if(error)throw error;
+    const login=await rpc("account_login",{p_gamertag:u});if(!login){formErr="That gamertag and password do not match an account.";return}
+    const {error}=await sb.auth.signInWithPassword({email:login,password:pw});if(error)throw error;
     await enter()},
-  async signup(){const n=val("suName").trim(),u=val("suUser").trim().toLowerCase().replace(/^@/,"");S.draftName=n;S.draftUser=u;S.draftTz=val("suTz");
-    if(!S.hasSession){S.draftEmail=val("suEmail").trim();
-      if(!/^\S+@\S+\.\S+$/.test(S.draftEmail)){formErr="Enter a valid email address.";return}
-      if(val("suPass").length<8){formErr="Choose a password with at least 8 characters.";return}}
+  async signup(){const n=val("suName").trim(),u=val("suUser").trim().toLowerCase().replace(/^@/,"");S.draftName=n;S.draftUser=u;S.draftTz=val("suTz");if(!S.hasSession)draftPass=val("suPass");
     if(!n){formErr="Add your first name.";return}if(!/^[a-z0-9_]{3,20}$/.test(u)){formErr="Gamertags are 3 to 20 letters, numbers or underscores.";return}
-    if(!S.hasSession){const {data,error}=await sb.auth.signUp({email:S.draftEmail,password:val("suPass")});if(error)throw error;
-      if(!data.session){formErr="Check your email for a confirmation link, then come back and sign in.";return}
-      S.hasSession=true;S.email=S.draftEmail;S.google=false}
+    if(!S.hasSession){if(val("suPass").length<8){formErr="Choose a password with at least 8 characters.";return}
+      if(await rpc("account_login",{p_gamertag:u})){formErr="That gamertag is taken. Try another.";return}
+      const login=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2))+"@"+LOGIN_DOMAIN;
+      const {data,error}=await sb.auth.signUp({email:login,password:val("suPass")});if(error)throw error;
+      if(!data.session){formErr="Sign-up is not fully set up yet. Ask Mike to turn off email confirmation in Supabase.";return}
+      S.hasSession=true;S.email=login;S.google=false;draftPass=""}
     await rpc("create_profile",{p_first_name:n,p_gamertag:u,p_tz:S.draftTz||"America/New_York"});await sync();await friendLink();S.step="friends"},
   async signOut(){try{if("serviceWorker" in navigator){const reg=await navigator.serviceWorker.getRegistration();const sub=reg&&await reg.pushManager.getSubscription();if(sub){await rpc("delete_push_sub",{p_endpoint:sub.endpoint}).catch(()=>{});await sub.unsubscribe()}}}catch(e){}
     prefs.set("push",null);await sb.auth.signOut();USERS={};ME=null;S=fresh();S.step="intro";sheet=null},
@@ -726,7 +729,8 @@ const A={
     if(!c){formErr="Enter your current password.";return}
     if(n.length<8){formErr="Choose a new password with at least 8 characters.";return}
     if(n===c){formErr="Choose a password different from your current one.";return}
-    const chk=await sb.auth.signInWithPassword({email:S.email,password:c});if(chk.error){formErr="Your current password is not right.";return}
+    const cur=await sb.auth.getUser(),login=(cur.data&&cur.data.user&&cur.data.user.email)||S.email;
+    const chk=await sb.auth.signInWithPassword({email:login,password:c});if(chk.error){formErr="Your current password is not right.";return}
     const up=await sb.auth.updateUser({password:n});if(up.error)throw up.error;
     note("Password changed","Use your new password the next time you sign in.",false)},
   async enablePush(){errAt="push";
@@ -797,7 +801,7 @@ document.addEventListener("input",e=>{if(e.target.id!=="fq")return;S.searchQ=e.t
   searchTimer=setTimeout(async()=>{const q=S.searchQ;try{const res=await rpc("search_gamertags",{q});if(q!==S.searchQ)return;S.searchRes=res||[]}catch(err){S.searchRes=[]}
     const box=document.getElementById("fres");if(box)box.innerHTML=friendResults()},250)});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&(sheet||lockOpen)){sheet=null;lockOpen=false;render()}
-  if(e.key==="Enter"&&e.target.tagName==="INPUT"){const m={suName:"signup",suUser:"signup",joinCode:"join",newSquad:"createSquad",newGame:"gameAdd",siEmail:"signinEmail",siPass:"signinEmail",suPass:"signup",pfTag:"saveTag",pfNew:"savePw"}[e.target.id];if(m)run(m,{})}});
+  if(e.key==="Enter"&&e.target.tagName==="INPUT"){const m={suName:"signup",suUser:"signup",joinCode:"join",newSquad:"createSquad",newGame:"gameAdd",siTag:"signinEmail",siPass:"signinEmail",suPass:"signup",pfTag:"saveTag",pfNew:"savePw"}[e.target.id];if(m)run(m,{})}});
 /* keep the schedule fresh while the app is open */
 async function refresh(){
   if(S.step!=="app"||document.hidden||busy||sheet||S.rankFor)return;
