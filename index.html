@@ -42,6 +42,7 @@ button{cursor:pointer}
 :focus-visible{outline:2px solid var(--full-hot);outline-offset:2px}
 .shell{max-width:440px;margin:0 auto;min-height:100%;background:var(--ink);position:relative;display:flex;flex-direction:column}
 @media(min-width:480px){.shell{border-left:1px solid var(--line);border-right:1px solid var(--line)}}
+body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--ink);z-index:35;pointer-events:none}
 #app{flex:1;display:flex;flex-direction:column;padding:calc(20px + env(safe-area-inset-top)) 16px 110px;gap:20px}
 h1,h2,h3{font-family:var(--display);font-stretch:125%;font-weight:800;margin:0;text-wrap:balance;line-height:1.05;letter-spacing:-.01em}
 h1{font-size:34px}
@@ -125,7 +126,7 @@ details.why ol{margin:6px 0 0;padding-left:18px}
 
 /* schedule grid */
 .sched{display:grid;gap:0 4px;position:relative}
-.sched .head{position:sticky;top:0;background:var(--ink);box-shadow:-8px 0 0 var(--ink),8px 0 0 var(--ink);z-index:5;padding:8px 0;height:72px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:600;text-align:center;margin-bottom:9px;min-width:0}
+.sched .head{position:sticky;top:env(safe-area-inset-top,0px);background:var(--ink);box-shadow:-8px 0 0 var(--ink),8px 0 0 var(--ink);z-index:5;padding:8px 0;height:72px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:600;text-align:center;margin-bottom:9px;min-width:0}
 .sched .head span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .schedwrap{overflow:visible}
 .sched .t{font-size:11px;color:var(--muted);text-align:right;padding-right:6px;height:26px;line-height:1;transform:translateY(-5px);font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -146,7 +147,8 @@ details.why ol{margin:6px 0 0;padding-left:18px}
 
 /* sheet */
 .scrim{position:fixed;inset:0;background:rgba(5,6,18,.7);z-index:40;display:flex;align-items:flex-end;justify-content:center}
-.sheet{background:var(--ink);border:1px solid var(--line);border-bottom:0;border-radius:22px 22px 0 0;width:100%;max-width:440px;max-height:94vh;max-height:calc(100dvh - 12px - env(safe-area-inset-top));overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:18px 16px calc(22px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:16px}
+.sheet{background:var(--ink);border:1px solid var(--line);border-bottom:0;border-radius:22px 22px 0 0;width:100%;max-width:440px;max-height:94vh;max-height:calc(100dvh - 12px - env(safe-area-inset-top));overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:18px 16px 0;display:flex;flex-direction:column;gap:16px}
+.sheetfoot{position:sticky;bottom:0;z-index:3;margin:auto -16px 0;padding:12px 16px calc(14px + env(safe-area-inset-bottom,0px));background:var(--ink);border-top:1px solid var(--line)}
 .sheet>*{flex-shrink:0}
 .stepper{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .stepper .val{font-family:var(--display);font-weight:800;font-size:26px;font-variant-numeric:tabular-nums}
@@ -602,7 +604,7 @@ function vSheet(){
     </div>
     <div class="stack" style="gap:8px"><p class="muted small">Repeat</p><div class="row wrap">${["none","daily","weekly"].map(r=>`<button class="chip ${sheet.repeat===r?"on":""}" data-a="rep" data-r="${r}">${r==="weekly"?"Every "+esc(wd):REP[r]}</button>`).join("")}</div></div>
     <div class="stack" style="gap:8px"><p class="muted small">Share with</p><div class="row wrap"><button class="chip ${sheet.squads==="all"?"on":""}" data-a="sqAll">All squads</button>${qs.map(q=>`<button class="chip ${sheet.squads!=="all"&&sheet.squads.includes(q.id)?"on":""}" data-a="sqTog" data-id="${q.id}">${esc(q.name)}</button>`).join("")}</div></div>
-    <button class="btn cta block" id="saveBtn" data-a="saveWin"></button>
+    <div class="sheetfoot"><button class="btn cta block" id="saveBtn" data-a="saveWin"></button></div>
   </div></div>`;
 }
 
