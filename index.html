@@ -35,12 +35,15 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
-html,body{height:100%;margin:0}
+html,body{margin:0}
+/* full screen height, not "100%": in an iPhone Home Screen app 100% can be shorter than the screen */
+html{min-height:100%;min-height:100lvh}
+body{min-height:100vh;min-height:100lvh}
 body{background:#0b0c1c;color:var(--text);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--full-hot);outline-offset:2px}
-.shell{max-width:440px;margin:0 auto;min-height:100%;background:var(--ink);position:relative;display:flex;flex-direction:column}
+.shell{max-width:440px;margin:0 auto;min-height:100vh;min-height:100lvh;background:var(--ink);position:relative;display:flex;flex-direction:column}
 @media(min-width:480px){.shell{border-left:1px solid var(--line);border-right:1px solid var(--line)}}
 body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--ink);z-index:35;pointer-events:none}
 #app{flex:1;display:flex;flex-direction:column;padding:calc(20px + env(safe-area-inset-top)) 16px 110px;gap:20px}
@@ -100,7 +103,7 @@ select.gsel{flex:1;min-width:0;padding:6px 38px 6px 10px;text-overflow:ellipsis;
 .steps{padding:0;margin:0}
 
 /* tab bar */
-.tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;background:rgba(18,20,43,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr 76px 1fr 1fr;align-items:center;padding:8px 8px calc(8px + env(safe-area-inset-bottom));z-index:20}
+.tabs{position:fixed;bottom:0;box-shadow:0 120px 0 0 rgb(18,20,43);left:50%;transform:translateX(-50%);width:100%;max-width:440px;background:rgba(18,20,43,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr 76px 1fr 1fr;align-items:center;padding:8px 8px calc(8px + env(safe-area-inset-bottom));z-index:20}
 .tabs button{background:none;border:0;padding:8px 0;font-size:13px;font-weight:600;color:var(--muted);border-radius:10px}
 .tabs button.on{color:var(--text)}
 .tabs .plus{width:58px;height:58px;border-radius:50%;background:var(--cta);color:var(--ink);font-family:var(--display);font-size:30px;font-weight:800;margin:-26px auto 0;display:grid;place-items:center;border:4px solid var(--ink);line-height:1}
