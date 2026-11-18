@@ -665,6 +665,16 @@ function vSquads(){
   <div class="panel stack"><h3>Join with a squad code</h3><div class="row"><input type="text" id="joinCode" placeholder="Squad code" autocapitalize="characters" aria-label="Squad code"><button class="btn" data-a="join">Join</button></div>${formErr?`<p class="err">${esc(formErr)}</p>`:""}<p class="muted small">Squads never show up in search. Ask a squad member for the code.</p></div>
   <div class="panel stack"><h3>Start a squad</h3><div class="row"><input type="text" id="newSquad" placeholder="Squad name" maxlength="24" aria-label="Squad name"><button class="btn" data-a="createSquad">Create</button></div></div>`;
 }
+/* after someone joins, offer to revisit rankings (remembered per phone, per squad) */
+function newPlayersCard(q,mineG){
+  const n=q.members.length,key="seen:"+q.id,seen=prefs.get(key);
+  if(seen==null||n<+seen){prefs.set(key,n);return ""}
+  if(n===+seen||!mineG.length)return "";
+  const added=n-(+seen),fresh=q.members.slice(-added).filter(m=>m!=="me").map(m=>person(m).name);
+  const who=fresh.length===1?`${esc(fresh[0])} joined ${esc(q.name)}`:`${added} new players joined ${esc(q.name)}`;
+  return `<div class="panel stack" style="border-color:var(--full-hot)"><div><strong>${who}</strong><p class="muted small">The squad has ${n} players now. Want to update your game rankings for the new head count?</p></div>
+  <div class="row wrap"><button class="btn sm primary" data-a="rankNew" data-id="${q.id}">Edit</button><button class="btn sm ghost" data-a="ackNew" data-id="${q.id}">Dismiss</button></div></div>`;
+}
 function vSquad(){
   const q=squad(S.squadId),off=S.dayOff,day=dayKey(off),n=q.members.length,ns=off===0?nowSlot():-1;
   const order=["me",...q.members.filter(m=>m!=="me")].filter(m=>q.members.includes(m));
@@ -700,6 +710,7 @@ function vSquad(){
     <p class="muted small">Everyone in ${esc(q.name)} sees the new name and icon.</p>
     <div class="row wrap"><button class="btn sm primary" data-a="saveSquad">Save</button><button class="btn sm ghost" data-a="cancelEditSquad">Cancel</button></div></div>`
   :`<div class="row" style="gap:12px">${sqIcon(q,true)}<h1 class="grow">${esc(q.name)}</h1></div>`}
+${newPlayersCard(q,mineG)}
   ${mineG.length?"":`<div class="panel stack" style="border-color:var(--full-hot)"><div><strong>Rank your games for this squad</strong><p class="muted small">Your picks count toward what ${esc(q.name)} plays each DubTime.</p></div><button class="btn primary" data-a="rank" data-id="${q.id}">Rank your game preferences</button></div>`}
   <div class="chips" role="tablist">${[0,1,2,3,4,5,6].map(o=>`<button class="chip ${o===off?"on":""}" data-a="day" data-off="${o}">${esc(dayLabel(o))}</button>`).join("")}</div>
   <button class="btn cta block" data-a="openSheet">Set dub availability</button>
@@ -993,6 +1004,8 @@ const A={
   async saveRank(){const id=S.rankFor;await rpc("set_rankings",{sid:id,p_games:S.rankDraft,apply_all:!!S.applyAll});await sync();finishRank()},
   skipRank(){finishRank()},applyAll(){S.applyAll=!S.applyAll},
   rank(d){S.tab="squads";S.squadId=d.id;startRank(d.id,false);scrollTo(0,0)},
+  ackNew(d){prefs.set("seen:"+d.id,squad(d.id).members.length)},
+  rankNew(d){A.ackNew(d);A.rank(d)},
   mkLink(){S.inviteLink=location.origin+"/?friend="+S.me.friendToken},
   friendsNext(){S.step="squad"},
   squadSkip(){S.step="app";S.tab="home";S.squadId=null},
