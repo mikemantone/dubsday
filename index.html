@@ -216,6 +216,10 @@ details.why ol{margin:6px 0 0;padding-left:18px}
 .icongrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:8px}
 .iconbtn{height:46px;border-radius:12px;border:1px solid var(--line);background:#2b2f5c;font-size:24px;line-height:1;display:grid;place-items:center;padding:0}
 .iconbtn.on{border:2px solid var(--cta);background:rgba(245,197,66,.14)}
+.sqmini{width:24px;height:24px;border-radius:7px;background:#2b2f5c;border:1px solid var(--line);display:inline-grid;place-items:center;font-size:14px;line-height:1;flex:none;vertical-align:middle}
+.sqmini.letter{font-family:var(--display);font-weight:900;font-size:12px;color:var(--text)}
+.sqname{display:inline-flex;align-items:center;gap:7px}
+.sqpick .who{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}
 .sqpick{display:flex;align-items:center;gap:10px;width:100%;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:11px 12px;text-align:left;font-size:15px}
 .sqpick .who b{font-weight:700}
 .sqi{min-width:26px;height:26px;padding:0 5px;border-radius:7px;display:grid;place-items:center;font-weight:800;font-size:12px;background:var(--cta);color:var(--ink);flex:none}
@@ -447,6 +451,7 @@ function chosenRanges(sq,day,from){const out=[];let cur=null;
   return out}
 /* squad icons: an emoji the owner picks, or the squad's first letter */
 const SQUAD_ICONS=["🎮","🕹️","👾","🎯","🏆","👑","🔥","⚡","💀","👻","🧟","🐉","🦖","🐺","🦅","🦈","🚀","🛸","🌙","⭐","🍕","🎲","⚔️","🛡️","💎","🦁","🐙","🎧","🌶️"];
+function sqMini(q){return `<span class="sqmini${q.icon?"":" letter"}" aria-hidden="true">${q.icon?esc(q.icon):esc((q.name||"?").slice(0,1).toUpperCase())}</span>`}
 function sqIcon(q,big){return `<span class="sqicon${big?" big":""}${q.icon?"":" letter"}" aria-hidden="true">${q.icon?esc(q.icon):esc((q.name||"?").slice(0,1).toUpperCase())}</span>`}
 function conflicts(){
   const out=[],qs=mySquads(),ns=nowSlot();
@@ -495,7 +500,7 @@ function conflictCard(c,showDay){
     let bar="";for(let s=c.lo;s<c.hi;){const t=st(s);let e=s+1;while(e<c.hi&&st(e)===t)e++;
       if(t)bar+=`<i class="${t}${s===c.lo||st(s-1)!==t||t==="away"?" l":""}${e===c.hi||st(e)!==t||t==="away"?" r":""}" style="left:${at(s)};width:${((e-s)/span*100).toFixed(3)}%"></i>`;s=e}
     o.pieces.forEach(([a,b])=>bar+=`<span class="clash" style="left:${at(a)};width:${((b-a)/span*100).toFixed(3)}%"></span>`);
-    return `<div class="cfo${o.best?" best":""}"><div class="row"><div class="grow"><div class="nm"><span class="badge ${o.full?"full":"dub"}">${o.full?"Full squad":o.k+"/"+o.n}</span><strong>${esc(o.q.name)}</strong></div>
+    return `<div class="cfo${o.best?" best":""}"><div class="row"><div class="grow"><div class="nm">${sqMini(o.q)}<strong>${esc(o.q.name)}</strong></div>
       <div class="game">${o.game?`Playing <b>${esc(o.game)}</b>`:"No game picked yet"}</div><div class="len">${hoursText(o.rb-o.ra)}, ${range(o.ra,o.rb)}</div></div>
       <button class="btn sm primary" data-a="pickSquad" data-k="${esc(c.key)}" data-id="${o.id}">Choose</button></div><div class="track" aria-hidden="true">${bar}</div></div>`};
   const body=c.opts.map(opt).join("");
@@ -526,7 +531,7 @@ function blockCard(b,opts={}){
     <div class="row"><span class="tier grow">DubTime</span>${live?'<span class="live">Live now</span>':""}<span class="chev" aria-hidden="true">${open?"▴":"▾"}</span></div>
     ${b.tier==="full"?'<div class="fs">Full-Squad</div>':""}
     <div class="when">${opts.day&&b.off!==0?`<span class="nw">${esc(dayLabel(b.off))}</span> `:""}<span class="nw">${range(b.a,b.b)}</span></div>
-    ${opts.squad?`<div class="muted small">${esc(q.name)}</div>`:""}
+    ${opts.squad?`<div class="muted small sqname">${sqMini(q)}${esc(q.name)}</div>`:""}
     <div>${b.game?`Play <strong>${esc(b.game)}</strong>`:'<span class="muted">No ranked game fits this head count yet</span>'}</div>
     ${body}
   </div>`;
@@ -765,14 +770,13 @@ const REP={none:"Just this day",daily:"Every day",weekly:""};
 /* who the new time is for: one line that opens a tick list */
 function squadPicker(qs){
   const sel=sheet.squads==="all"?null:qs.filter(q=>sheet.squads.includes(q.id));
-  const names=sel?sel.map(q=>`<b>${esc(q.name)}</b>`):null;
-  const who=!sel?"<b>All squads</b>":names.length===1?names[0]+" only":names.length===2?names.join(" and "):names.slice(0,-1).join(", ")+" and "+names[names.length-1];
-  const icons=(sel||[]).slice(0,3).map(q=>`<span class="sqi">${esc(q.name.slice(0,1).toUpperCase())}</span>`).join("")||`<span class="sqi">All</span>`;
+  const items=sel?sel.map(q=>`<span class="sqname">${sqMini(q)}<b>${esc(q.name)}</b></span>`):null;
+  const who=!sel?"<b>All squads</b>":items.length===1?items[0]+"<span>only</span>":items.map((x,i)=>x+(i<items.length-2?"<span>,</span>":i===items.length-2?"<span>and</span>":"")).join("");
   const open=!!sheet.pickOpen;
   return `<div class="stack" style="gap:6px"><p class="muted small" id="pickLbl">Choose squad</p>
-  <button class="sqpick" data-a="sqMenu" aria-expanded="${open}" aria-labelledby="pickLbl"><span class="row" style="gap:4px">${icons}</span><span class="grow who">${who}</span><span class="muted small">${open?"Done ▴":"Change ▾"}</span></button>
+  <button class="sqpick" data-a="sqMenu" aria-expanded="${open}" aria-labelledby="pickLbl"><span class="grow who">${who}</span><span class="muted small">${open?"Done ▴":"Change ▾"}</span></button>
   ${open?`<div class="sqmenu" role="group" aria-label="Choose squad"><button class="ck${sheet.squads==="all"?" on":""}" data-a="sqAll" aria-pressed="${sheet.squads==="all"}"><span class="box" aria-hidden="true">${sheet.squads==="all"?"✓":""}</span>All squads<span class="hint">Every squad, now and later</span></button>
-    ${qs.map(q=>{const on=sheet.squads!=="all"&&sheet.squads.includes(q.id);return `<button class="ck${on?" on":""}" data-a="sqTog" data-id="${q.id}" aria-pressed="${on}"><span class="box" aria-hidden="true">${on?"✓":""}</span>${esc(q.name)}</button>`}).join("")}</div>`:""}</div>`;
+    ${qs.map(q=>{const on=sheet.squads!=="all"&&sheet.squads.includes(q.id);return `<button class="ck${on?" on":""}" data-a="sqTog" data-id="${q.id}" aria-pressed="${on}"><span class="box" aria-hidden="true">${on?"✓":""}</span>${sqMini(q)}${esc(q.name)}</button>`}).join("")}</div>`:""}</div>`;
 }
 function vSheet(){
   const qs=mySquads(),day=dayKey(sheet.off),d0=slotAbs(day,0),d1=slotAbs(day,SLOTS),mine=((S.iv||{}).me||[]).filter(x=>x.s<d1&&x.e>d0).sort((x,y)=>x.s-y.s);
