@@ -123,7 +123,8 @@ select.gsel{flex:1;min-width:0;padding:6px 38px 6px 10px;text-overflow:ellipsis;
 .block.full .rr .when2{color:#d6e4ff}
 .pk{display:flex;flex-direction:column;gap:6px;font-size:14px}
 .pkh{font-weight:700;font-size:13px}
-.block .when{font-family:var(--display);font-weight:800;font-size:clamp(18px,5.6vw,22px);font-stretch:110%;font-variant-numeric:tabular-nums;white-space:nowrap}
+.block .when{font-family:var(--display);font-weight:800;font-size:clamp(18px,5.6vw,22px);font-stretch:110%;font-variant-numeric:tabular-nums}
+.block .when .nw{white-space:nowrap}
 .block.full{background:linear-gradient(135deg,#1b3fb3,var(--full) 55%,#5a93ff);border-color:var(--full-hot);box-shadow:0 0 0 1px rgba(141,184,255,.4),0 8px 34px rgba(43,107,255,.55);position:relative;overflow:hidden;color:#fff}
 .block.full .tier{color:#fff}
 .block.full .fs{font-family:var(--display);font-weight:900;font-stretch:150%;font-size:26px;line-height:1;margin-top:-2px}
@@ -412,7 +413,7 @@ function blockCard(b,opts={}){
   return `<div class="block ${b.tier} tap${live?" is-live":""}" data-a="toggleCard" data-id="${esc(b.id)}" role="button" tabindex="0" aria-expanded="${open}" aria-label="${tier}">
     <div class="row"><span class="tier grow">DubTime</span>${live?'<span class="live">Live now</span>':""}<span class="chev" aria-hidden="true">${open?"▴":"▾"}</span></div>
     ${b.tier==="full"?'<div class="fs">Full-Squad</div>':""}
-    <div class="when">${opts.day?esc(dayLabel(b.off))+" ":""}${range(b.a,b.b)}</div>
+    <div class="when">${opts.day?`<span class="nw">${esc(dayLabel(b.off))}</span> `:""}<span class="nw">${range(b.a,b.b)}</span></div>
     ${opts.squad?`<div class="muted small">${esc(q.name)}</div>`:""}
     <div>${b.game?`Play <strong>${esc(b.game)}</strong>`:'<span class="muted">No ranked game fits this head count yet</span>'}</div>
     ${body}
