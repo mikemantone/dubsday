@@ -209,6 +209,13 @@ details.why ol{margin:6px 0 0;padding-left:18px}
 /* sheet */
 .scrim{position:fixed;inset:0;background:rgba(5,6,18,.7);z-index:40;display:flex;align-items:flex-end;justify-content:center}
 .sheet{background:var(--ink);border:1px solid var(--line);border-bottom:0;border-radius:22px 22px 0 0;width:100%;max-width:440px;max-height:94vh;max-height:calc(100dvh - 12px - env(safe-area-inset-top));overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:18px 16px 0;display:flex;flex-direction:column;gap:16px}
+.sqicon{width:44px;height:44px;border-radius:12px;background:#2b2f5c;border:1px solid var(--line);display:grid;place-items:center;font-size:24px;line-height:1;flex:none}
+.sqicon.big{width:52px;height:52px;border-radius:14px;font-size:30px}
+.sqicon.letter,.iconbtn.letter{font-family:var(--display);font-weight:900;font-stretch:120%;font-size:20px;color:var(--text)}
+.sqicon.big.letter{font-size:24px}
+.icongrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:8px}
+.iconbtn{height:46px;border-radius:12px;border:1px solid var(--line);background:#2b2f5c;font-size:24px;line-height:1;display:grid;place-items:center;padding:0}
+.iconbtn.on{border:2px solid var(--cta);background:rgba(245,197,66,.14)}
 .sqpick{display:flex;align-items:center;gap:10px;width:100%;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:11px 12px;text-align:left;font-size:15px}
 .sqpick .who b{font-weight:700}
 .sqi{min-width:26px;height:26px;padding:0 5px;border-radius:7px;display:grid;place-items:center;font-weight:800;font-size:12px;background:var(--cta);color:var(--ink);flex:none}
@@ -324,7 +331,7 @@ function applyState(st){
   USERS={};for(const k in st.people)USERS[k]=st.people[k];
   st.req_in.concat(st.req_out).forEach(r=>{if(!USERS[r.id])USERS[r.id]={name:null,u:r.u}});
   S.friends=st.friends;S.reqIn=st.req_in.map(r=>r.id);S.reqOut=st.req_out.map(r=>r.id);
-  S.squads=st.squads.map(q=>({id:q.id,name:q.name,code:q.code,token:q.invite_token,owner:q.owner?id(q.owner):null,members:(q.members||[]).map(id)}));
+  S.squads=st.squads.map(q=>({id:q.id,name:q.name,icon:q.icon||null,code:q.code,token:q.invite_token,owner:q.owner?id(q.owner):null,members:(q.members||[]).map(id)}));
   S.invites=st.invites;
   S.rank={};st.rankings.forEach(r=>{(S.rank[r.squad]=S.rank[r.squad]||{})[id(r.uid)]=r.games});
   S.avail={me:[]};st.avail.forEach(w=>{const u=id(w.uid);(S.avail[u]=S.avail[u]||[]).push({id:w.id,day:w.day,a:w.a,b:w.b,repeat:w.repeat,tz:w.tz||"America/New_York",squads:w.squads===null?"all":w.squads})});
@@ -335,7 +342,7 @@ function applyState(st){
 async function sync(){applyState(await rpc("get_state"))}
 const ERR={gamertag_taken:"That gamertag is taken. Try another.",bad_gamertag:"Gamertags are 3 to 20 letters, numbers or underscores.",bad_name:"Use a name of 20 characters or fewer.",
   no_squad:"No squad uses that code. Check it with whoever invited you.",squad_full:"That squad is full.",not_friends:"You can only invite people on your friends list.",
-  too_many_squads:"You are in the maximum number of squads.",not_signed_in:"Your session ended. Sign in again.",no_profile:"Finish creating your profile first.",bad_day:"That day is too far away.",bad_tz:"That time zone is not supported. Pick another one.",not_owner:"Only the squad owner can remove members."};
+  too_many_squads:"You are in the maximum number of squads.",not_signed_in:"Your session ended. Sign in again.",no_profile:"Finish creating your profile first.",bad_day:"That day is too far away.",bad_tz:"That time zone is not supported. Pick another one.",not_owner:"Only the squad owner can do that.",bad_icon:"Pick an icon from the list."};
 function errText(e){const m=(e&&e.message)||String(e);for(const k in ERR)if(m.includes(k))return ERR[k];
   if(/Invalid login credentials/i.test(m))return "That gamertag and password do not match an account.";
   if(/not authorized|not confirmed|confirmation/i.test(m))return "Sign-up is not fully set up yet. Ask Mike to turn off email confirmation in Supabase.";
@@ -438,6 +445,9 @@ function chosenRanges(sq,day,from){const out=[];let cur=null;
     if(cur){out.push(cur);cur=null}
     if(c)cur={squad:c.squad,a:s,b:s+1}}
   return out}
+/* squad icons: an emoji the owner picks, or the squad's first letter */
+const SQUAD_ICONS=["🎮","🕹️","👾","🎯","🏆","👑","🔥","⚡","💀","👻","🧟","🐉","🦖","🐺","🦅","🦈","🚀","🛸","🌙","⭐","🍕","🎲","⚔️","🛡️","💎","🦁","🐙","🎧","🌶️"];
+function sqIcon(q,big){return `<span class="sqicon${big?" big":""}${q.icon?"":" letter"}" aria-hidden="true">${q.icon?esc(q.icon):esc((q.name||"?").slice(0,1).toUpperCase())}</span>`}
 function conflicts(){
   const out=[],qs=mySquads(),ns=nowSlot();
   for(let o=0;o<7;o++){const day=dayKey(o);let cur=null;
@@ -633,7 +643,7 @@ function vHome(){
 function vSquads(){
   const qs=mySquads();
   return `<h1>Squads</h1>
-  ${qs.length?qs.map(q=>{const b=sessions(q,0).concat(sessions(q,1)).find(x=>!(x.off===0&&x.b<=nowSlot()));return `<button class="panel row" style="text-align:left;width:100%" data-a="openSquad" data-id="${q.id}" data-off="0"><span class="grow"><strong>${esc(q.name)}</strong><br><span class="muted small">${q.members.map(m=>m==="me"?"You":person(m).name).join(", ")}</span>${b?`<br><span class="small"><i class="dot ${b.tier}"></i> ${esc(whenText(b))}</span>`:""}</span><span aria-hidden="true">›</span></button>`}).join(""):`<p class="muted">You are not in a squad yet. Accept an invite, enter a code, or start one.</p>`}
+  ${qs.length?qs.map(q=>{const b=sessions(q,0).concat(sessions(q,1)).find(x=>!(x.off===0&&x.b<=nowSlot()));return `<button class="panel row" style="text-align:left;width:100%" data-a="openSquad" data-id="${q.id}" data-off="0">${sqIcon(q)}<span class="grow"><strong>${esc(q.name)}</strong><br><span class="muted small">${q.members.map(m=>m==="me"?"You":person(m).name).join(", ")}</span>${b?`<br><span class="small"><i class="dot ${b.tier}"></i> ${esc(whenText(b))}</span>`:""}</span><span aria-hidden="true">›</span></button>`}).join(""):`<p class="muted">You are not in a squad yet. Accept an invite, enter a code, or start one.</p>`}
   <div class="panel stack"><h3>Join with a squad code</h3><div class="row"><input type="text" id="joinCode" placeholder="Squad code" autocapitalize="characters" aria-label="Squad code"><button class="btn" data-a="join">Join</button></div>${formErr?`<p class="err">${esc(formErr)}</p>`:""}<p class="muted small">Squads never show up in search. Ask a squad member for the code.</p></div>
   <div class="panel stack"><h3>Start a squad</h3><div class="row"><input type="text" id="newSquad" placeholder="Squad name" maxlength="24" aria-label="Squad name"><button class="btn" data-a="createSquad">Create</button></div></div>`;
 }
@@ -663,8 +673,15 @@ function vSquad(){
   bl.filter(b=>b.tier==="full").forEach(b=>{const a=rowOf[Math.max(b.a,first)],e=rowOf[b.b-1]+1;
     h+=`<div class="glow" style="grid-row:${a}/${e};grid-column:2/-1"></div><div class="wtag" style="grid-row:${a}/${e};grid-column:2/-1">${b.b-b.a>=2?"FULL SQUAD":"W"}</div>`});
   const nonFriends=S.friends.filter(f=>!q.members.includes(f)),mineG=gamesOf("me",q.id);
-  return `<div class="row"><button class="btn sm ghost" data-a="backSquads">‹ Squads</button></div>
-  <h1>${esc(q.name)}</h1>
+  const ed=S.editSq&&S.editSq.id===q.id?S.editSq:null;
+  return `<div class="row"><button class="btn sm ghost" data-a="backSquads">‹ Squads</button><span class="grow"></span>${q.owner==="me"&&!ed?`<button class="btn sm ghost" data-a="editSquad">✎ Edit</button>`:""}</div>
+  ${ed?`<div class="panel stack"><h3>Edit squad</h3>
+    <div class="field"><label for="sqName">Squad name</label><input type="text" id="sqName" maxlength="24" value="${esc(ed.name)}"></div>
+    <div class="stack" style="gap:8px"><p class="muted small">Icon</p><div class="icongrid">${["",...SQUAD_ICONS].map(ic=>`<button class="iconbtn${ic===(ed.icon||"")?" on":""}${ic?"":" letter"}" data-a="pickIcon" data-ic="${esc(ic)}" aria-pressed="${ic===(ed.icon||"")}" aria-label="${ic?esc(ic):"First letter of the name"}">${ic?esc(ic):esc((ed.name||q.name).slice(0,1).toUpperCase())}</button>`).join("")}</div></div>
+    ${formErr?`<p class="err">${esc(formErr)}</p>`:""}
+    <p class="muted small">Everyone in ${esc(q.name)} sees the new name and icon.</p>
+    <div class="row wrap"><button class="btn sm primary" data-a="saveSquad">Save</button><button class="btn sm ghost" data-a="cancelEditSquad">Cancel</button></div></div>`
+  :`<div class="row" style="gap:12px">${sqIcon(q,true)}<h1 class="grow">${esc(q.name)}</h1></div>`}
   ${mineG.length?"":`<div class="panel stack" style="border-color:var(--full-hot)"><div><strong>Rank your games for this squad</strong><p class="muted small">Your picks count toward what ${esc(q.name)} plays each DubTime.</p></div><button class="btn primary" data-a="rank" data-id="${q.id}">Rank your game preferences</button></div>`}
   <div class="chips" role="tablist">${[0,1,2,3,4,5,6].map(o=>`<button class="chip ${o===off?"on":""}" data-a="day" data-off="${o}">${esc(dayLabel(o))}</button>`).join("")}</div>
   <button class="btn cta block" data-a="openSheet">Set dub availability</button>
@@ -965,8 +982,8 @@ const A={
   gameUp(d){const l=S.rankDraft,i=+d.i;[l[i-1],l[i]]=[l[i],l[i-1]]},gameDown(d){const l=S.rankDraft,i=+d.i;[l[i+1],l[i]]=[l[i],l[i+1]]},
   gameDel(d){S.rankDraft.splice(+d.i,1)},
   gameAdd(){const v=val("newGame").trim().slice(0,60);if(v&&S.rankDraft.length<5&&!S.rankDraft.some(g=>g.name.toLowerCase()===v.toLowerCase()))S.rankDraft.push({name:v,need:"2"});S.addOther=false},
-  tab(d){S.tab=d.id;S.squadId=null;S.rankFor=null;S.confirmDelete=false;S.confirmRemove=null;S.confirmLeave=false;S.confirmUnfriend=null;S.searchQ="";S.searchRes=[]},
-  openSquad(d){S.rankFor=null;S.confirmRemove=null;S.confirmLeave=false;S.tab="squads";S.squadId=d.id;S.dayOff=+d.off||0;scrollTo(0,0)},backSquads(){S.squadId=null},
+  tab(d){S.tab=d.id;S.squadId=null;S.editSq=null;S.rankFor=null;S.confirmDelete=false;S.confirmRemove=null;S.confirmLeave=false;S.confirmUnfriend=null;S.searchQ="";S.searchRes=[]},
+  openSquad(d){S.editSq=null;S.rankFor=null;S.confirmRemove=null;S.confirmLeave=false;S.tab="squads";S.squadId=d.id;S.dayOff=+d.off||0;scrollTo(0,0)},backSquads(){S.squadId=null;S.editSq=null},
   day(d){S.dayOff=+d.off},
   async acceptInvite(d){await withAlerts(()=>rpc("respond_squad_invitation",{sid:d.id,accept:true}));afterJoin(d.id)},
   async declineInvite(d){await rpc("respond_squad_invitation",{sid:d.id,accept:false});await sync()},
@@ -999,6 +1016,11 @@ const A={
   async saveWin(){prefs.set("lastWin",sheet.start+","+(sheet.start+sheet.dur));const off=sheet.off,args={p_day:dayKey(off),p_a:sheet.start,p_b:sheet.start+sheet.dur,p_repeat:sheet.repeat,p_squads:sheet.squads==="all"?null:sheet.squads};
     await withAlerts(()=>rpc("add_availability",args));sheet=null;if(S.squadId)S.dayOff=off},
   async delWin(d){await rpc("delete_availability",{aid:d.id});await sync()},
+  editSquad(){const q=squad(S.squadId);S.editSq={id:q.id,name:q.name,icon:q.icon||""};formErr=""},
+  cancelEditSquad(){S.editSq=null;formErr=""},
+  pickIcon(d){S.editSq.name=val("sqName");S.editSq.icon=d.ic||""},
+  async saveSquad(){const n=val("sqName").trim();S.editSq.name=n;if(!n){formErr="Give the squad a name.";return}
+    await rpc("update_squad",{sid:S.editSq.id,p_name:n,p_icon:S.editSq.icon||null});S.editSq=null;formErr="";await sync();note("Squad updated","Everyone in "+n+" sees the change.")},
   async unpick(d){const [day,a,b]=d.k.split("|"),s0=new Date(slotAbs(day,+a)).toISOString(),s1=new Date(slotAbs(day,+b)).toISOString();
     await rpc("uncommit",{p_start:s0,p_end:s1});await sync();scrollTo(0,0);note("Choice undone","Pick a squad again in the DubTime Conflict card.")},
   async pickSquad(d){const c=conflicts().find(x=>x.key===d.k),o=c&&c.opts.find(x=>x.id===d.id);if(!o)return;
@@ -1024,7 +1046,7 @@ document.addEventListener("input",e=>{if(e.target.id!=="fq")return;S.searchQ=e.t
     const box=document.getElementById("fres");if(box)box.innerHTML=friendResults()},250)});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&(sheet||lockOpen)){sheet=null;lockOpen=false;render()}
   if((e.key==="Enter"||e.key===" ")&&e.target.dataset&&e.target.dataset.a==="toggleCard"){e.preventDefault();run("toggleCard",e.target.dataset,e.target);return}
-  if(e.key==="Enter"&&e.target.tagName==="INPUT"){const m={suName:"signup",suUser:"signup",joinCode:"join",newSquad:"createSquad",newGame:"gameAdd",siTag:"signinEmail",siPass:"signinEmail",suPass:"signup",pfTag:"saveTag",pfNew:"savePw"}[e.target.id];if(m)run(m,{})}});
+  if(e.key==="Enter"&&e.target.tagName==="INPUT"){const m={suName:"signup",suUser:"signup",joinCode:"join",newSquad:"createSquad",sqName:"saveSquad",newGame:"gameAdd",siTag:"signinEmail",siPass:"signinEmail",suPass:"signup",pfTag:"saveTag",pfNew:"savePw"}[e.target.id];if(m)run(m,{})}});
 /* keep the schedule fresh while the app is open */
 async function refresh(){
   if(S.step!=="app"||document.hidden||busy||sheet||S.rankFor)return;
