@@ -320,6 +320,16 @@ const sb=window.__sbMock||supabase.createClient(SB_URL,SB_KEY);
 let USERS={},ME=null;
 const GOOGLE_SIGNIN=false; /* turn on once a Google sign-in client is set up in Supabase */
 const LOGIN_DOMAIN="users.dubsday.vercel.app"; /* accounts get a meaningless login here; no email is collected or sent */
+/* how many friends can party up in each game (the unit is shown under the name); squads hold up to 6, so 6 means "everyone" */
+const PARTY={"Apex Legends":[3,"squad"],"Battlefield 6":[4,"squad"],"Call of Duty: Warzone":[4,"squad"],"Fortnite":[4,"squad"],"Gears of War: E-Day":[4,"squad"],
+  "Halo Infinite":[12,"fireteam"],"Helldivers 2":[4,"squad"],"Monster Hunter Wilds":[4,"party"],"Overwatch 2":[6,"party"],"Rocket League":[4,"party"],
+  "Sid Meier's Civilization VII":[6],"Valheim":[6],"Enshrouded":[6],"Minecraft":[6],"V Rising":[6]};
+/* head-count choices that make sense for this game in a squad of n */
+function needOptions(name,n,cur){const max=PARTY[name]?PARTY[name][0]:99,out=["2"];
+  for(let k=3;k<=Math.min(max,n-1,5);k++)out.push(String(k));
+  if(max>=n)out.push("full");
+  if(cur&&!out.includes(cur))out.push(cur);
+  return out.sort((x,y)=>(x==="full"?99:+x)-(y==="full"?99:+y))}
 const GAME_IDEAS=["Apex Legends","Battlefield 6","Call of Duty: Warzone","Enshrouded","Fortnite","Gears of War: E-Day","Halo Infinite","Helldivers 2","Minecraft","Monster Hunter Wilds","Overwatch 2","Rocket League","Sid Meier's Civilization VII","V Rising","Valheim"];
 function fresh(){return {step:"loading",tab:"home",squadId:null,dayOff:0,me:null,squads:[],invites:[],friends:[],reqIn:[],reqOut:[],avail:{me:[]},commits:[],rank:{},
   notif:{found:true,warn:true,live:true},hasSession:false,google:false,email:"",linkInvite:null,searchQ:"",searchRes:[],sqLinks:{},open:new Set()}}
@@ -345,7 +355,7 @@ function applyState(st){
 }
 async function sync(){applyState(await rpc("get_state"))}
 const ERR={gamertag_taken:"That gamertag is taken. Try another.",bad_gamertag:"Gamertags are 3 to 20 letters, numbers or underscores.",bad_name:"Use a name of 20 characters or fewer.",
-  no_squad:"No squad uses that code. Check it with whoever invited you.",squad_full:"That squad is full.",not_friends:"You can only invite people on your friends list.",
+  no_squad:"No squad uses that code. Check it with whoever invited you.",squad_full:"That squad is full. Squads hold up to 6 people.",not_friends:"You can only invite people on your friends list.",
   too_many_squads:"You are in the maximum number of squads.",not_signed_in:"Your session ended. Sign in again.",no_profile:"Finish creating your profile first.",bad_day:"That day is too far away.",bad_tz:"That time zone is not supported. Pick another one.",not_owner:"Only the squad owner can do that.",bad_icon:"Pick an icon from the list."};
 function errText(e){const m=(e&&e.message)||String(e);for(const k in ERR)if(m.includes(k))return ERR[k];
   if(/Invalid login credentials/i.test(m))return "That gamertag and password do not match an account.";
@@ -538,13 +548,13 @@ function blockCard(b,opts={}){
 }
 
 function gamesEditor(){
-  const list=S.rankDraft;
+  const list=S.rankDraft,rq=S.rankFor&&squad(S.rankFor),n=rq?Math.max(2,rq.members.length):6;
   return `<div class="stack">
     ${list.map((g,i)=>`<div class="panel row" style="padding:12px">
       <span class="rank">${i+1}</span>
-      <div class="grow stack" style="gap:8px"><strong>${esc(g.name)}</strong>
+      <div class="grow stack" style="gap:8px"><div><strong>${esc(g.name)}</strong>${PARTY[g.name]&&PARTY[g.name][1]?`<div class="muted small">Up to ${PARTY[g.name][0]} in a ${PARTY[g.name][1]}</div>`:""}</div>
       <div class="row"><select class="gsel" id="need-${i}" data-change="need" data-i="${i}" aria-label="Players needed for ${esc(g.name)}">
-        <option value="2"${g.need==="2"?" selected":""}>2+ players</option><option value="3"${g.need==="3"?" selected":""}>3+ players</option><option value="full"${g.need==="full"?" selected":""}>Full squad only</option></select>
+        ${needOptions(g.name,n,g.need).map(v=>`<option value="${v}"${g.need===v?" selected":""}>${v==="full"?"Full squad only":v+"+ players"}</option>`).join("")}</select>
       <button class="icon" data-a="gameUp" data-i="${i}" aria-label="Move ${esc(g.name)} up" ${i===0?"disabled":""}>↑</button>
       <button class="icon" data-a="gameDown" data-i="${i}" aria-label="Move ${esc(g.name)} down" ${i===list.length-1?"disabled":""}>↓</button>
       <button class="icon" data-a="gameDel" data-i="${i}" aria-label="Remove ${esc(g.name)}">✕</button></div></div></div>`).join("")}
