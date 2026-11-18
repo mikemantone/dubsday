@@ -192,6 +192,10 @@ details.why ol{margin:6px 0 0;padding-left:18px}
 .sched .c.solo{background:var(--solo)}
 .sched .c.dub{background:var(--dub)}
 .sched .c.full{background:transparent;position:relative;z-index:2}
+.sched .awayband{grid-column:auto;border-radius:6px;margin:1px 0;background:repeating-linear-gradient(135deg,rgba(255,255,255,.16) 0 4px,transparent 4px 8px);border:1px dashed rgba(255,255,255,.18);pointer-events:none;z-index:1}
+.chosen{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:#d5d6ea}
+.chosen strong{color:var(--text)}
+.chosen .sw{width:22px;height:14px;border-radius:4px;margin-top:3px}
 .sched .c.first{border-radius:6px 6px 0 0}.sched .c.last{border-radius:0 0 6px 6px}.sched .c.first.last{border-radius:6px}
 .sched .glow{background:linear-gradient(135deg,#1b3fb3,var(--full) 55%,#5a93ff);border:1px solid var(--full-hot);margin:0 -3px;border-radius:8px;animation:pulse 2.4s ease-in-out infinite;z-index:1;position:relative;overflow:hidden}
 .sched .glow::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.28) 50%,transparent 65%);transform:translateX(-100%);animation:sheen 3.2s ease-in-out infinite}
@@ -414,6 +418,14 @@ function myBlocks(){
 }
 /* times where I am part of a DubTime in more than one squad, one entry per evening */
 function freeFor(uid,sq,day,s){const t=slotAbs(day,s),u=t+SLOTMS;return (((S.iv||{})[uid])||[]).some(x=>x.s<=t&&u<=x.e&&(x.squads==="all"||x.squads.includes(sq)))}
+/* my own choice of another squad that removed this time from squad sq (only I ever see this) */
+function chosenElsewhere(sq,day,s){if(!freeFor("me",sq,day,s))return null;const t=slotAbs(day,s),u=t+SLOTMS;return S.commits.find(c=>c.uid==="me"&&c.squad!==sq&&c.s<u&&c.e>t)||null}
+function chosenRanges(sq,day,from){const out=[];let cur=null;
+  for(let s=from;s<=SLOTS;s++){const c=s<SLOTS?chosenElsewhere(sq,day,s):null;
+    if(c&&cur&&cur.squad===c.squad){cur.b=s+1;continue}
+    if(cur){out.push(cur);cur=null}
+    if(c)cur={squad:c.squad,a:s,b:s+1}}
+  return out}
 function conflicts(){
   const out=[],qs=mySquads(),ns=nowSlot();
   for(let o=0;o<7;o++){const day=dayKey(o);let cur=null;
@@ -634,6 +646,8 @@ function vSquad(){
       h+=`<div class="c ${t}${hr?" hr":""}${on&&!prev?" first":""}${on&&!nxt?" last":""}${m==="me"?" mine":""}${past}" style="grid-row:${r};grid-column:${i+2}" ${m==="me"?'data-a="openSheet"':""}></div>`});
     r++;
   }
+  const away=chosenRanges(q.id,day,first);
+  away.forEach(x=>{h+=`<div class="awayband" style="grid-row:${rowOf[x.a]}/${rowOf[x.b-1]+1};grid-column:2" aria-hidden="true"></div>`});
   bl.filter(b=>b.tier==="full").forEach(b=>{const a=rowOf[Math.max(b.a,first)],e=rowOf[b.b-1]+1;
     h+=`<div class="glow" style="grid-row:${a}/${e};grid-column:2/-1"></div><div class="wtag" style="grid-row:${a}/${e};grid-column:2/-1">${b.b-b.a>=2?"FULL SQUAD":"W"}</div>`});
   const nonFriends=S.friends.filter(f=>!q.members.includes(f)),mineG=gamesOf("me",q.id);
@@ -643,6 +657,7 @@ function vSquad(){
   <div class="chips" role="tablist">${[0,1,2,3,4,5,6].map(o=>`<button class="chip ${o===off?"on":""}" data-a="day" data-off="${o}">${esc(dayLabel(o))}</button>`).join("")}</div>
   <button class="btn cta block" data-a="openSheet">Set dub availability</button>
   ${conflicts().filter(c=>c.off===off&&c.opts.some(o=>o.id===q.id)).map(c=>conflictCard(c,false)).join("")}
+  ${chosenRanges(q.id,day,0).map(x=>{const o=squad(x.squad);return `<div class="panel chosen"><i class="sw away" aria-hidden="true"></i><div><strong>You chose ${esc(o?o.name:"another squad")}</strong> for ${range(x.a,x.b)}, so that time is removed from your availability in ${esc(q.name)}.</div></div>`}).join("")}
   ${cards.length?`<div class="stack">${cards.map(b=>blockCard(b)).join("")}</div>`:`<p class="muted">No overlap on this dub day yet.</p>`}
   <div class="legend"><span><i class="dot solo"></i>No overlap</span><span><i class="dot dub"></i>DubTime</span><span><i class="dot full"></i>Full-Squad DubTime</span></div>
   <div class="schedwrap" data-k="${q.id}|${off}" data-top="${top-first}"><div class="sched" style="grid-template-columns:${cols}">${h}</div></div>
