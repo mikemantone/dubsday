@@ -198,7 +198,7 @@ details.why ol{margin:6px 0 0;padding-left:18px}
 
 /* lock screen preview */
 .lock{position:fixed;inset:0;z-index:50;background:radial-gradient(120% 80% at 50% 0%,#2a2f6b,#0b0c1c 70%);display:flex;justify-content:center;overflow-y:auto}
-.lock .in{width:100%;max-width:440px;padding:24px 14px 30px;display:flex;flex-direction:column;gap:10px}
+.lock .in{width:100%;max-width:440px;margin:auto 0;padding:calc(env(safe-area-inset-top) + 24px) 14px calc(env(safe-area-inset-bottom) + 24px);display:flex;flex-direction:column;gap:10px}
 .lock .clock{font-family:var(--display);font-weight:700;font-size:76px;text-align:center;line-height:1;font-variant-numeric:tabular-nums}
 .lock .date{text-align:center;color:#d5d6ea;margin-bottom:18px}
 .la{background:rgba(20,22,48,.92);border:1px solid var(--full-hot);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px}
