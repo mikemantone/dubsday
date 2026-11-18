@@ -674,7 +674,7 @@ function vSquad(){
     h+=`<div class="glow" style="grid-row:${a}/${e};grid-column:2/-1"></div><div class="wtag" style="grid-row:${a}/${e};grid-column:2/-1">${b.b-b.a>=2?"FULL SQUAD":"W"}</div>`});
   const nonFriends=S.friends.filter(f=>!q.members.includes(f)),mineG=gamesOf("me",q.id);
   const ed=S.editSq&&S.editSq.id===q.id?S.editSq:null;
-  return `<div class="row"><button class="btn sm ghost" data-a="backSquads">‹ Squads</button><span class="grow"></span>${q.owner==="me"&&!ed?`<button class="btn sm ghost" data-a="editSquad">✎ Edit</button>`:""}</div>
+  return `<div class="row"><button class="btn sm ghost" data-a="backSquads">‹ Squads</button><span class="grow"></span>${q.owner==="me"&&!ed?`<button class="btn sm ghost" data-a="editSquad">Edit</button>`:""}</div>
   ${ed?`<div class="panel stack"><h3>Edit squad</h3>
     <div class="field"><label for="sqName">Squad name</label><input type="text" id="sqName" maxlength="24" value="${esc(ed.name)}"></div>
     <div class="stack" style="gap:8px"><p class="muted small">Icon</p><div class="icongrid">${["",...SQUAD_ICONS].map(ic=>`<button class="iconbtn${ic===(ed.icon||"")?" on":""}${ic?"":" letter"}" data-a="pickIcon" data-ic="${esc(ic)}" aria-pressed="${ic===(ed.icon||"")}" aria-label="${ic?esc(ic):"First letter of the name"}">${ic?esc(ic):esc((ed.name||q.name).slice(0,1).toUpperCase())}</button>`).join("")}</div></div>
