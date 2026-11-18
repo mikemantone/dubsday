@@ -726,6 +726,9 @@ function drawScreen(){
     if(sheet)h+=vSheet();if(lockOpen)h+=vLock();
   }
   app.innerHTML=h;persist();
+  /* a new page always opens at the top; re-drawing the same page keeps its place */
+  const pageKey=S.step!=="app"?S.step:S.rankFor&&squad(S.rankFor)?"rank:"+S.rankFor:S.squadId&&S.tab==="squads"?"squad:"+S.squadId:S.tab;
+  if(pageKey!==drawScreen.page){drawScreen.page=pageKey;scrollTo(0,0)}
   const nw=document.querySelector(".schedwrap");if(nw)nw.scrollTop=nw.dataset.k===ok?ot:+nw.dataset.top*26;
   const sp=document.getElementById("suPass");if(sp&&draftPass)sp.value=draftPass;
   const fq=document.getElementById("fq");if(fq){fq.value=S.searchQ;document.getElementById("fres").innerHTML=friendResults()}
