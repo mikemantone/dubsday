@@ -193,9 +193,11 @@ details.why ol{margin:6px 0 0;padding-left:18px}
 .sched .c.dub{background:var(--dub)}
 .sched .c.full{background:transparent;position:relative;z-index:2}
 .sched .awayband{grid-column:auto;border-radius:6px;margin:1px 0;background:repeating-linear-gradient(135deg,rgba(255,255,255,.16) 0 4px,transparent 4px 8px);border:1px dashed rgba(255,255,255,.18);pointer-events:none;z-index:1}
-.chosen{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:#d5d6ea}
+.chosen{gap:10px;font-size:14px;color:#d5d6ea}
+.chosen p{margin:0}
+.chosen .row{gap:10px;align-items:center}
 .chosen strong{color:var(--text)}
-.chosen .sw{width:22px;height:14px;border-radius:4px;margin-top:3px}
+.chosen .sw{width:22px;height:14px;border-radius:4px}
 .sched .c.first{border-radius:6px 6px 0 0}.sched .c.last{border-radius:0 0 6px 6px}.sched .c.first.last{border-radius:6px}
 .sched .glow{background:linear-gradient(135deg,#1b3fb3,var(--full) 55%,#5a93ff);border:1px solid var(--full-hot);margin:0 -3px;border-radius:8px;animation:pulse 2.4s ease-in-out infinite;z-index:1;position:relative;overflow:hidden}
 .sched .glow::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.28) 50%,transparent 65%);transform:translateX(-100%);animation:sheen 3.2s ease-in-out infinite}
@@ -656,8 +658,8 @@ function vSquad(){
   ${mineG.length?"":`<div class="panel stack" style="border-color:var(--full-hot)"><div><strong>Rank your games for this squad</strong><p class="muted small">Your picks count toward what ${esc(q.name)} plays each DubTime.</p></div><button class="btn primary" data-a="rank" data-id="${q.id}">Rank your game preferences</button></div>`}
   <div class="chips" role="tablist">${[0,1,2,3,4,5,6].map(o=>`<button class="chip ${o===off?"on":""}" data-a="day" data-off="${o}">${esc(dayLabel(o))}</button>`).join("")}</div>
   <button class="btn cta block" data-a="openSheet">Set dub availability</button>
+  ${chosenRanges(q.id,day,0).map(x=>{const o=squad(x.squad);return `<div class="panel stack chosen"><div class="row"><i class="sw away" aria-hidden="true"></i><strong>You chose ${esc(o?o.name:"another squad")}</strong></div><p>${range(x.a,x.b)} has been removed from your availability in ${esc(q.name)}.</p><button class="btn sm" data-a="unpick" data-k="${day}|${x.a}|${x.b}" style="align-self:flex-start">Change my mind</button></div>`}).join("")}
   ${conflicts().filter(c=>c.off===off&&c.opts.some(o=>o.id===q.id)).map(c=>conflictCard(c,false)).join("")}
-  ${chosenRanges(q.id,day,0).map(x=>{const o=squad(x.squad);return `<div class="panel chosen"><i class="sw away" aria-hidden="true"></i><div class="stack" style="gap:10px"><div><strong>You chose ${esc(o?o.name:"another squad")}</strong> for ${range(x.a,x.b)}, so that time is removed from your availability in ${esc(q.name)}.</div><button class="btn sm" data-a="unpick" data-k="${day}|${x.a}|${x.b}" style="align-self:flex-start">Change my mind</button></div></div>`}).join("")}
   ${cards.length?`<div class="stack">${cards.map(b=>blockCard(b)).join("")}</div>`:`<p class="muted">No overlap on this dub day yet.</p>`}
   <div class="legend"><span><i class="dot solo"></i>No overlap</span><span><i class="dot dub"></i>DubTime</span><span><i class="dot full"></i>Full-Squad DubTime</span></div>
   <div class="schedwrap" data-k="${q.id}|${off}" data-top="${top-first}"><div class="sched" style="grid-template-columns:${cols}">${h}</div></div>
