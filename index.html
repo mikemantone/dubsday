@@ -351,7 +351,8 @@ function startRank(id,thenAvail){
   S.rankFor=id;S.rankThenAvail=!!thenAvail;S.applyAll=false;S.addOther=false;
   S.rankDraft=clone(mine.length?mine:other?gamesOf("me",other):[]);
 }
-function afterJoin(id){S.step="app";S.tab="squads";S.squadId=id;S.dayOff=0;startRank(id,true)}
+/* joining during onboarding ends on Home; joining later ends on the squad's page */
+function afterJoin(id){const onb=S.step!=="app";S.step="app";S.tab=onb?"home":"squads";S.squadId=onb?null:id;S.dayOff=0;startRank(id,true)}
 function finishRank(){const then=S.rankThenAvail;S.rankFor=null;S.rankDraft=null;if(then)openSheet()}
 
 /* ---------- scheduling logic ---------- */
@@ -937,7 +938,7 @@ const A={
   rank(d){S.tab="squads";S.squadId=d.id;startRank(d.id,false);scrollTo(0,0)},
   mkLink(){S.inviteLink=location.origin+"/?friend="+S.me.friendToken},
   friendsNext(){S.step="squad"},
-  squadSkip(){S.step="app";S.tab="squads";S.squadId=null},
+  squadSkip(){S.step="app";S.tab="home";S.squadId=null},
   gameUp(d){const l=S.rankDraft,i=+d.i;[l[i-1],l[i]]=[l[i],l[i-1]]},gameDown(d){const l=S.rankDraft,i=+d.i;[l[i+1],l[i]]=[l[i],l[i+1]]},
   gameDel(d){S.rankDraft.splice(+d.i,1)},
   gameAdd(){const v=val("newGame").trim().slice(0,60);if(v&&S.rankDraft.length<5&&!S.rankDraft.some(g=>g.name.toLowerCase()===v.toLowerCase()))S.rankDraft.push({name:v,need:"2"});S.addOther=false},
@@ -951,7 +952,7 @@ const A={
   sqLink(){S.sqLinks[S.squadId]=location.origin+"/?invite="+squad(S.squadId).token},
   async join(){const c=val("joinCode").trim();if(!c){formErr="Enter a squad code.";return}
     const was=S.squads.map(q=>q.id);let id;await withAlerts(async()=>{id=await rpc("join_squad_by_code",{p_code:c})});
-    if(!was.includes(id))afterJoin(id);else{S.step="app";S.tab="squads";S.squadId=id;S.dayOff=0}},
+    if(!was.includes(id))afterJoin(id);else if(S.step!=="app"){S.step="app";S.tab="home";S.squadId=null}else{S.tab="squads";S.squadId=id;S.dayOff=0}},
   async createSquad(){const n=val("newSquad").trim();if(!n){formErr="Give your squad a name.";return}
     const id=await rpc("create_squad",{p_name:n});await sync();afterJoin(id)},
   async inviteFriend(d){await rpc("invite_friend_to_squad",{sid:S.squadId,friend:d.id});note("Invite sent",person(d.id).name+" will see it on their Home screen.",false)},
