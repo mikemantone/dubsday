@@ -576,7 +576,7 @@ function vSquad(){
     <div class="row wrap"><span class="grow">Squad code <strong>${esc(q.code)}</strong></span><button class="btn sm" data-a="copy" data-t="${esc(q.code)}">Copy code</button></div>
     ${S.sqLinks&&S.sqLinks[q.id]?`<div class="row wrap"><span class="grow" style="word-break:break-all">${esc(S.sqLinks[q.id])}</span><button class="btn sm" data-a="copy" data-t="${esc(S.sqLinks[q.id])}">Copy link</button></div><p class="muted small">Whoever opens this link is asked to join this squad once they sign in.</p>`:`<button class="btn sm" data-a="sqLink" style="align-self:flex-start">Create squad invite link</button>`}
     ${nonFriends.length?`<div class="stack"><p class="muted small">Invite a friend</p>${nonFriends.map(f=>`<div class="row">${avatar(f)}<span class="grow">${esc(person(f).name)}</span><button class="btn sm" data-a="inviteFriend" data-id="${f}">Invite</button></div>`).join("")}</div>`:""}
-    <button class="btn sm ghost" data-a="leave" style="align-self:flex-start;color:var(--danger)">Leave squad</button></div>`;
+    ${S.confirmLeave?leaveBox(q):`<button class="btn sm ghost" data-a="askLeave" style="align-self:flex-start;color:var(--danger)">Leave squad</button>`}</div>`;
 }
 const tagAv=id=>`<span class="av" aria-hidden="true">${esc((person(id).u[0]||"?").toUpperCase())}</span>`;
 function friendResults(){
@@ -584,13 +584,20 @@ function friendResults(){
   if(!S.searchRes.length)return `<p class="muted small">Nobody found with that gamertag.</p>`;
   return S.searchRes.map(r=>`<div class="row"><span class="av" aria-hidden="true">${esc(r.u[0].toUpperCase())}</span><strong class="grow">@${esc(r.u)}</strong>${S.friends.includes(r.id)?'<span class="muted small">Friends</span>':S.reqOut.includes(r.id)?'<span class="muted small">Request sent</span>':S.reqIn.includes(r.id)?`<button class="btn sm primary" data-a="acceptFriend" data-id="${r.id}">Accept</button>`:`<button class="btn sm" data-a="addFriend" data-id="${r.id}">Add friend</button>`}</div>`).join("");
 }
+function leaveBox(q){
+  const alone=q.members.length===1,owner=q.owner==="me";
+  return `<div class="panel stack" style="border-color:var(--danger)"><strong>${alone?"Leave and delete "+esc(q.name)+"?":"Leave "+esc(q.name)+"?"}</strong>
+  <p class="muted small">${alone?"You are the only member, so the squad and its schedule are deleted. This can't be undone.":"You will stop seeing this squad and its schedule, and your game rankings for it are deleted. You can only rejoin with the squad code or an invite link."+(owner?" The member who has been in the squad longest becomes the owner.":"")}</p>
+  <div class="row wrap"><button class="btn sm danger" data-a="leave">${alone?"Leave and delete squad":"Leave squad"}</button><button class="btn sm ghost" data-a="cancelLeave">Cancel</button></div></div>`}
 function vFriends(){
   const link=S.inviteLink||"";
   return `<h1>Friends</h1>
   <div class="panel stack"><div class="field"><label for="fq">Find people by gamertag</label><input type="text" id="fq" placeholder="Type a gamertag" autocapitalize="off" autocomplete="off"></div><div id="fres" class="stack"></div></div>
-  ${S.reqIn.length?`<div class="stack"><h3>Requests</h3>${S.reqIn.map(id=>`<div class="panel row">${tagAv(id)}<div class="grow"><strong>@${esc(person(id).u)}</strong><div class="muted small">Wants to be friends</div></div><button class="btn sm primary" data-a="acceptFriend" data-id="${id}">Accept</button></div>`).join("")}</div>`:""}
-  <div class="stack"><h3>Your friends</h3>${S.friends.length?S.friends.map(id=>`<div class="panel row">${avatar(id)}<div class="grow"><strong>${esc(person(id).name)}</strong><div class="muted small">@${esc(person(id).u)}</div></div><button class="btn sm ghost" data-a="removeFriend" data-id="${id}">Remove</button></div>`).join(""):`<p class="muted">No friends yet. Search by gamertag above, or share your invite link.</p>`}
-  ${S.reqOut.map(id=>`<div class="panel row">${tagAv(id)}<div class="grow"><strong>@${esc(person(id).u)}</strong></div><span class="muted small">Request sent</span></div>`).join("")}</div>
+  ${S.reqIn.length?`<div class="stack"><h3>Requests</h3>${S.reqIn.map(id=>`<div class="panel row">${tagAv(id)}<div class="grow"><strong>@${esc(person(id).u)}</strong><div class="muted small">Wants to be friends</div></div><button class="btn sm primary" data-a="acceptFriend" data-id="${id}">Accept</button><button class="btn sm ghost" data-a="dropRequest" data-id="${id}">Decline</button></div>`).join("")}</div>`:""}
+  <div class="stack"><h3>Your friends</h3>${S.friends.length?S.friends.map(id=>`<div class="panel row">${avatar(id)}<div class="grow"><strong>${esc(person(id).name)}</strong><div class="muted small">@${esc(person(id).u)}</div></div>${S.confirmUnfriend!==id?`<button class="btn sm ghost" data-a="askUnfriend" data-id="${id}" style="color:var(--danger)">Remove</button>`:""}</div>
+    ${S.confirmUnfriend===id?`<div class="panel stack" style="border-color:var(--danger)"><strong>Remove ${esc(person(id).name)} as a friend?</strong><p class="muted small">You both stay in any squads you share. To be friends again, one of you needs to find the other by gamertag and send a new request.</p>
+    <div class="row wrap"><button class="btn sm danger" data-a="removeFriend" data-id="${id}">Remove friend</button><button class="btn sm ghost" data-a="cancelUnfriend">Cancel</button></div></div>`:""}`).join(""):`<p class="muted">No friends yet. Search by gamertag above, or share your invite link.</p>`}
+  ${S.reqOut.map(id=>`<div class="panel row">${tagAv(id)}<div class="grow"><strong>@${esc(person(id).u)}</strong></div><span class="muted small">Request sent</span><button class="btn sm ghost" data-a="dropRequest" data-id="${id}">Cancel</button></div>`).join("")}</div>
   <div class="panel stack"><h3>Invite friends to DubsDay</h3>${link?`<div class="row wrap"><span class="grow" style="word-break:break-all">${esc(link)}</span><button class="btn sm" data-a="copy" data-t="${esc(link)}">Copy link</button></div><p class="muted small">Anyone who opens this link and creates a profile is added to your friends list.</p>`:`<button class="btn" data-a="mkLink">Create invite link</button>`}</div>`;
 }
 function pushOn(){try{return "Notification" in window&&Notification.permission==="granted"&&prefs.get("push")==="1"}catch(e){return false}}
@@ -838,8 +845,8 @@ const A={
   gameUp(d){const l=S.rankDraft,i=+d.i;[l[i-1],l[i]]=[l[i],l[i-1]]},gameDown(d){const l=S.rankDraft,i=+d.i;[l[i+1],l[i]]=[l[i],l[i+1]]},
   gameDel(d){S.rankDraft.splice(+d.i,1)},
   gameAdd(){const v=val("newGame").trim().slice(0,60);if(v&&S.rankDraft.length<5&&!S.rankDraft.some(g=>g.name.toLowerCase()===v.toLowerCase()))S.rankDraft.push({name:v,need:"2"});S.addOther=false},
-  tab(d){S.tab=d.id;S.squadId=null;S.rankFor=null;S.confirmDelete=false;S.confirmRemove=null;S.searchQ="";S.searchRes=[]},
-  openSquad(d){S.rankFor=null;S.confirmRemove=null;S.tab="squads";S.squadId=d.id;S.dayOff=+d.off||0;scrollTo(0,0)},backSquads(){S.squadId=null},
+  tab(d){S.tab=d.id;S.squadId=null;S.rankFor=null;S.confirmDelete=false;S.confirmRemove=null;S.confirmLeave=false;S.confirmUnfriend=null;S.searchQ="";S.searchRes=[]},
+  openSquad(d){S.rankFor=null;S.confirmRemove=null;S.confirmLeave=false;S.tab="squads";S.squadId=d.id;S.dayOff=+d.off||0;scrollTo(0,0)},backSquads(){S.squadId=null},
   day(d){S.dayOff=+d.off},
   async acceptInvite(d){await withAlerts(()=>rpc("respond_squad_invitation",{sid:d.id,accept:true}));afterJoin(d.id)},
   async declineInvite(d){await rpc("respond_squad_invitation",{sid:d.id,accept:false});await sync()},
@@ -852,11 +859,14 @@ const A={
   async createSquad(){const n=val("newSquad").trim();if(!n){formErr="Give your squad a name.";return}
     const id=await rpc("create_squad",{p_name:n});await sync();afterJoin(id)},
   async inviteFriend(d){await rpc("invite_friend_to_squad",{sid:S.squadId,friend:d.id});note("Invite sent",person(d.id).name+" will see it on their Home screen.",false)},
-  async leave(){await rpc("leave_squad",{sid:S.squadId});S.squadId=null;await sync()},
+  askLeave(){S.confirmLeave=true;setTimeout(()=>scrollTo({top:document.body.scrollHeight,behavior:"smooth"}),0)},cancelLeave(){S.confirmLeave=false},
+  async leave(){const q=squad(S.squadId),alone=q.members.length===1;await rpc("leave_squad",{sid:S.squadId});S.confirmLeave=false;S.squadId=null;await sync();note(alone?q.name+" deleted":"You left "+q.name,alone?"":"You can rejoin with the squad code or an invite link.")},
   copy(d,el){try{navigator.clipboard.writeText(d.t).then(()=>{el.textContent="Copied"},()=>{})}catch(e){}return false},
   async addFriend(d){await rpc("send_friend_request",{target:d.id});await sync()},
   async acceptFriend(d){await rpc("accept_friend_request",{from_id:d.id});await sync()},
-  async removeFriend(d){await rpc("remove_friend",{other:d.id});await sync()},
+  askUnfriend(d){S.confirmUnfriend=d.id},cancelUnfriend(){S.confirmUnfriend=null},
+  async removeFriend(d){const nm=person(d.id).name;await rpc("remove_friend",{other:d.id});S.confirmUnfriend=null;await sync();note(nm+" removed","You are no longer friends.")},
+  async dropRequest(d){await rpc("remove_friend",{other:d.id});await sync()},
   async notif(d){const n=Object.assign({},S.notif);n[d.k]=!n[d.k];S.notif=n;await rpc("update_profile",{p_first_name:null,p_gamertag:null,p_notif:n})},
   a2hsHide(){prefs.set("a2hs","1")},
   lock(){lockOpen=true},unlock(){lockOpen=false},
