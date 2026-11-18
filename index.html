@@ -657,7 +657,7 @@ function vSquad(){
   <div class="chips" role="tablist">${[0,1,2,3,4,5,6].map(o=>`<button class="chip ${o===off?"on":""}" data-a="day" data-off="${o}">${esc(dayLabel(o))}</button>`).join("")}</div>
   <button class="btn cta block" data-a="openSheet">Set dub availability</button>
   ${conflicts().filter(c=>c.off===off&&c.opts.some(o=>o.id===q.id)).map(c=>conflictCard(c,false)).join("")}
-  ${chosenRanges(q.id,day,0).map(x=>{const o=squad(x.squad);return `<div class="panel chosen"><i class="sw away" aria-hidden="true"></i><div><strong>You chose ${esc(o?o.name:"another squad")}</strong> for ${range(x.a,x.b)}, so that time is removed from your availability in ${esc(q.name)}.</div></div>`}).join("")}
+  ${chosenRanges(q.id,day,0).map(x=>{const o=squad(x.squad);return `<div class="panel chosen"><i class="sw away" aria-hidden="true"></i><div class="stack" style="gap:10px"><div><strong>You chose ${esc(o?o.name:"another squad")}</strong> for ${range(x.a,x.b)}, so that time is removed from your availability in ${esc(q.name)}.</div><button class="btn sm" data-a="unpick" data-k="${day}|${x.a}|${x.b}" style="align-self:flex-start">Change my mind</button></div></div>`}).join("")}
   ${cards.length?`<div class="stack">${cards.map(b=>blockCard(b)).join("")}</div>`:`<p class="muted">No overlap on this dub day yet.</p>`}
   <div class="legend"><span><i class="dot solo"></i>No overlap</span><span><i class="dot dub"></i>DubTime</span><span><i class="dot full"></i>Full-Squad DubTime</span></div>
   <div class="schedwrap" data-k="${q.id}|${off}" data-top="${top-first}"><div class="sched" style="grid-template-columns:${cols}">${h}</div></div>
@@ -972,6 +972,8 @@ const A={
   async saveWin(){prefs.set("lastWin",sheet.start+","+(sheet.start+sheet.dur));const off=sheet.off,args={p_day:dayKey(off),p_a:sheet.start,p_b:sheet.start+sheet.dur,p_repeat:sheet.repeat,p_squads:sheet.squads==="all"?null:sheet.squads};
     await withAlerts(()=>rpc("add_availability",args));sheet=null;if(S.squadId)S.dayOff=off},
   async delWin(d){await rpc("delete_availability",{aid:d.id});await sync()},
+  async unpick(d){const [day,a,b]=d.k.split("|"),s0=new Date(slotAbs(day,+a)).toISOString(),s1=new Date(slotAbs(day,+b)).toISOString();
+    await rpc("uncommit",{p_start:s0,p_end:s1});await sync();scrollTo(0,0);note("Choice undone","Pick a squad again in the DubTime Conflict card.")},
   async pickSquad(d){const c=conflicts().find(x=>x.key===d.k),o=c&&c.opts.find(x=>x.id===d.id);if(!o)return;
     for(const [a,b] of o.pieces)await rpc("commit_squad",{p_start:new Date(slotAbs(c.day,a)).toISOString(),p_end:new Date(slotAbs(c.day,b)).toISOString(),sid:o.id});
     await sync();const a=o.pieces[0][0],b=o.pieces[o.pieces.length-1][1];note("You're in with "+o.q.name,range(a,b)+". That time is cleared from your other squads.")}
