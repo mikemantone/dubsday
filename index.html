@@ -413,7 +413,7 @@ function blockCard(b,opts={}){
   return `<div class="block ${b.tier} tap${live?" is-live":""}" data-a="toggleCard" data-id="${esc(b.id)}" role="button" tabindex="0" aria-expanded="${open}" aria-label="${tier}">
     <div class="row"><span class="tier grow">DubTime</span>${live?'<span class="live">Live now</span>':""}<span class="chev" aria-hidden="true">${open?"▴":"▾"}</span></div>
     ${b.tier==="full"?'<div class="fs">Full-Squad</div>':""}
-    <div class="when">${opts.day?`<span class="nw">${esc(dayLabel(b.off))}</span> `:""}<span class="nw">${range(b.a,b.b)}</span></div>
+    <div class="when">${opts.day&&b.off!==0?`<span class="nw">${esc(dayLabel(b.off))}</span> `:""}<span class="nw">${range(b.a,b.b)}</span></div>
     ${opts.squad?`<div class="muted small">${esc(q.name)}</div>`:""}
     <div>${b.game?`Play <strong>${esc(b.game)}</strong>`:'<span class="muted">No ranked game fits this head count yet</span>'}</div>
     ${body}
