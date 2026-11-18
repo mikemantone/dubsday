@@ -324,9 +324,11 @@ const LOGIN_DOMAIN="users.dubsday.vercel.app"; /* accounts get a meaningless log
 const PARTY={"Apex Legends":[3,"squad"],"Battlefield 6":[4,"squad"],"Call of Duty: Warzone":[4,"squad"],"Fortnite":[4,"squad"],"Gears of War: E-Day":[4,"squad"],
   "Halo Infinite":[12,"fireteam"],"Helldivers 2":[4,"squad"],"Monster Hunter Wilds":[4,"party"],"Overwatch 2":[6,"party"],"Rocket League":[4,"party"],
   "Sid Meier's Civilization VII":[6],"Valheim":[6],"Enshrouded":[6],"Minecraft":[6],"V Rising":[6]};
+/* "Full squad only", "3 players (max)" when that's all the game's party holds, otherwise "3+ players" */
+function needLabel(name,v){if(v==="full")return "Full squad only";const max=PARTY[name]?PARTY[name][0]:99;return +v>=max?max+" players (max)":v+"+ players"}
 /* head-count choices that make sense for this game in a squad of n */
 function needOptions(name,n,cur){const max=PARTY[name]?PARTY[name][0]:99,out=["2"];
-  for(let k=3;k<=Math.min(max,n-1,5);k++)out.push(String(k));
+  for(let k=3;k<=Math.min(max,n-1);k++)out.push(String(k));
   if(max>=n)out.push("full");
   if(cur&&!out.includes(cur))out.push(cur);
   return out.sort((x,y)=>(x==="full"?99:+x)-(y==="full"?99:+y))}
@@ -553,9 +555,9 @@ function gamesEditor(){
   return `<div class="stack">
     ${list.map((g,i)=>`<div class="panel row" style="padding:12px">
       <span class="rank">${i+1}</span>
-      <div class="grow stack" style="gap:8px"><div><strong>${esc(g.name)}</strong>${PARTY[g.name]&&PARTY[g.name][1]?`<div class="muted small">Up to ${PARTY[g.name][0]} in a ${PARTY[g.name][1]}</div>`:""}</div>
+      <div class="grow stack" style="gap:8px"><strong>${esc(g.name)}</strong>
       <div class="row"><select class="gsel" id="need-${i}" data-change="need" data-i="${i}" aria-label="Players needed for ${esc(g.name)}">
-        ${needOptions(g.name,n,g.need).map(v=>`<option value="${v}"${g.need===v?" selected":""}>${v==="full"?"Full squad only":v+"+ players"}</option>`).join("")}</select>
+        ${needOptions(g.name,n,g.need).map(v=>`<option value="${v}"${g.need===v?" selected":""}>${needLabel(g.name,v)}</option>`).join("")}</select>
       <button class="icon" data-a="gameUp" data-i="${i}" aria-label="Move ${esc(g.name)} up" ${i===0?"disabled":""}>↑</button>
       <button class="icon" data-a="gameDown" data-i="${i}" aria-label="Move ${esc(g.name)} down" ${i===list.length-1?"disabled":""}>↓</button>
       <button class="icon" data-a="gameDel" data-i="${i}" aria-label="Remove ${esc(g.name)}">✕</button></div></div></div>`).join("")}
@@ -707,7 +709,7 @@ function vSquad(){
   <div class="legend"><span><i class="dot solo"></i>No overlap</span><span><i class="dot dub"></i>DubTime</span><span><i class="dot full"></i>Full-Squad DubTime</span></div>
   <div class="schedwrap" data-k="${q.id}|${off}" data-top="${top-first}"><div class="sched" style="grid-template-columns:${cols}">${h}</div></div>
   <p class="muted small">${off===0?"Starts an hour before now and runs":"Runs"} to the end of the dub day at 4:00am. Times are in ${esc(tzName(TZ))}.</p>
-  ${mineG.length?`<div class="panel stack"><div class="row"><h3 class="grow">Your game rankings here</h3><button class="btn sm" data-a="rank" data-id="${q.id}">Edit</button></div>${mineG.map((g,i)=>`<div class="row"><span class="rank">${i+1}</span><span class="grow">${esc(g.name)}</span><span class="muted small">${g.need==="full"?"Full squad only":g.need+"+ players"}</span></div>`).join("")}</div>`:""}
+  ${mineG.length?`<div class="panel stack"><div class="row"><h3 class="grow">Your game rankings here</h3><button class="btn sm" data-a="rank" data-id="${q.id}">Edit</button></div>${mineG.map((g,i)=>`<div class="row"><span class="rank">${i+1}</span><span class="grow">${esc(g.name)}</span><span class="muted small">${needLabel(g.name,g.need)}</span></div>`).join("")}</div>`:""}
   <div class="panel stack"><h3>Members</h3>
     ${order.map(m=>`<div class="row">${avatar(m)}<div class="grow"><strong>${m==="me"?"You":esc(person(m).name)}</strong><div class="muted small">@${esc(person(m).u)}${q.owner===m?", squad owner":""}</div></div>${q.owner==="me"&&m!=="me"&&S.confirmRemove!==m?`<button class="btn sm ghost" data-a="askRemove" data-id="${m}" style="color:var(--danger)">Remove</button>`:""}</div>
       ${S.confirmRemove===m?`<div class="panel stack" style="border-color:var(--danger)"><strong>Remove ${esc(person(m).name)} from ${esc(q.name)}?</strong><p class="muted small">They will no longer see this squad or its schedule, and their game rankings for it are deleted. They can only rejoin with the squad code or an invite link.</p>
