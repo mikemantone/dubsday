@@ -718,6 +718,7 @@ function render(){
 function drawScreen(){
   const app=document.getElementById("app"),sh=document.querySelector(".sheet"),st=sh?sh.scrollTop:0;let h;
   const ow=document.querySelector(".schedwrap"),ok=ow?ow.dataset.k:"",ot=ow?ow.scrollTop:0;
+  const chipKey=c=>{const b=c.querySelector("[data-a]");return b?b.dataset.a:""},chipX={};document.querySelectorAll(".chips").forEach(c=>chipX[chipKey(c)]=c.scrollLeft);
   if(S.step==="loading")h=`<div class="wordmark">Dubs<b>Day</b></div><p class="muted">Loading…</p>`;else if(S.step==="intro")h=vIntro();else if(S.step==="start")h=vStart();else if(S.step==="signin")h=vSignin();else if(S.step==="signup")h=vSignup();else if(S.step==="friends")h=vOnFriends();else if(S.step==="squad")h=vOnSquad();
   else{
     h=S.rankFor&&squad(S.rankFor)?vRank():S.squadId&&S.tab==="squads"?vSquad():S.tab==="home"?vHome():S.tab==="squads"?vSquads():S.tab==="friends"?vFriends():vProfile();
@@ -729,6 +730,9 @@ function drawScreen(){
   /* a new page always opens at the top; re-drawing the same page keeps its place */
   const pageKey=S.step!=="app"?S.step:S.rankFor&&squad(S.rankFor)?"rank:"+S.rankFor:S.squadId&&S.tab==="squads"?"squad:"+S.squadId:S.tab;
   if(pageKey!==drawScreen.page){drawScreen.page=pageKey;scrollTo(0,0)}
+  /* day buttons keep their sideways scroll, and slide just enough to show the picked day */
+  document.querySelectorAll(".chips").forEach(c=>{const k=chipKey(c);if(k in chipX)c.scrollLeft=chipX[k];const on=c.querySelector(".on");if(!on)return;
+    const cr=c.getBoundingClientRect(),or=on.getBoundingClientRect(),pad=16;if(or.left<cr.left+pad)c.scrollLeft-=cr.left+pad-or.left;else if(or.right>cr.right-pad)c.scrollLeft+=or.right-(cr.right-pad)});
   const nw=document.querySelector(".schedwrap");if(nw)nw.scrollTop=nw.dataset.k===ok?ot:+nw.dataset.top*26;
   const sp=document.getElementById("suPass");if(sp&&draftPass)sp.value=draftPass;
   const fq=document.getElementById("fq");if(fq){fq.value=S.searchQ;document.getElementById("fres").innerHTML=friendResults()}
