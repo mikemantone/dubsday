@@ -414,7 +414,8 @@ function blocks(q,off){
 function pickGame(q,members){
   const n=q.members.length,k=members.length,ok=need=>need==="full"?k===n:k>=+need;
   const blocked=new Set(),seen=new Set();
-  members.forEach(m=>gamesOf(m,q.id).forEach(g=>{seen.add(g.name);if(!ok(g.need))blocked.add(g.name)}));
+  /* a game is skipped when its head-count rule isn't met, or more people are free than its party holds */
+  members.forEach(m=>gamesOf(m,q.id).forEach(g=>{seen.add(g.name);if(!ok(g.need)||k>(PARTY[g.name]?PARTY[g.name][0]:99))blocked.add(g.name)}));
   const alive=new Set([...seen].filter(g=>!blocked.has(g)));
   const ballots=members.map(m=>gamesOf(m,q.id).map(g=>g.name).filter(g=>alive.has(g)));
   const borda={};ballots.forEach(b=>b.forEach((g,i)=>borda[g]=(borda[g]||0)+5-i));

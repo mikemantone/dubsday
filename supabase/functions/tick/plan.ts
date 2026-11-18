@@ -3,6 +3,12 @@
 // each message is worded in the recipient's time zone. Pure: no I/O.
 
 const MIN = 60000;
+// How many friends can party up in each game (keep in step with PARTY in index.html).
+const PARTY: Record<string, number> = {
+  "Apex Legends": 3, "Battlefield 6": 4, "Call of Duty: Warzone": 4, "Fortnite": 4, "Gears of War: E-Day": 4,
+  "Halo Infinite": 12, "Helldivers 2": 4, "Monster Hunter Wilds": 4, "Overwatch 2": 6, "Rocket League": 4,
+  "Sid Meier's Civilization VII": 6, "Valheim": 6, "Enshrouded": 6, "Minecraft": 6, "V Rising": 6,
+};
 const SLOT = 30 * MIN;
 
 export type Win = { uid: string; day: string; a: number; b: number; repeat: string; squads: string[] | null; tz: string };
@@ -96,7 +102,8 @@ export function plan(st: State, now: number, site: string) {
     const ok = (need: string) => (need === "full" ? k === n : k >= Number(need));
     const games = (m: string) => (rank[q.id] && rank[q.id][m]) || [];
     const blocked = new Set<string>(), seen = new Set<string>();
-    members.forEach((m) => games(m).forEach((g) => { seen.add(g.name); if (!ok(g.need)) blocked.add(g.name); }));
+    // a game is skipped when its head-count rule isn't met, or more people are free than its party holds
+    members.forEach((m) => games(m).forEach((g) => { seen.add(g.name); if (!ok(g.need) || k > (PARTY[g.name] ?? 99)) blocked.add(g.name); }));
     const alive = new Set([...seen].filter((g) => !blocked.has(g)));
     const ballots = members.map((m) => games(m).map((g) => g.name).filter((g) => alive.has(g)));
     const borda: Record<string, number> = {};
