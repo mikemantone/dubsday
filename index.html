@@ -859,7 +859,9 @@ function defaultWindow(off){
 function openSheet(){
   if(!mySquads().length){note("Join a squad first","Accept an invite on Home or enter a squad code.",false);return}
   const off=S.squadId&&S.tab==="squads"?S.dayOff:0;
-  sheet=Object.assign({off,squads:"all",repeat:"none",touched:false},defaultWindow(off));
+  /* on a squad's page, new availability is for that squad only */
+  const here=S.tab==="squads"&&S.squadId&&squad(S.squadId)?[S.squadId]:"all";
+  sheet=Object.assign({off,squads:here,repeat:"none",touched:false},defaultWindow(off));
 }
 const val=id=>{const e=document.getElementById(id);return e?e.value:""};
 const b64u=s=>{const p="=".repeat((4-s.length%4)%4),b=atob((s+p).replace(/-/g,"+").replace(/_/g,"/"));return Uint8Array.from(b,c=>c.charCodeAt(0))};
