@@ -209,6 +209,15 @@ details.why ol{margin:6px 0 0;padding-left:18px}
 /* sheet */
 .scrim{position:fixed;inset:0;background:rgba(5,6,18,.7);z-index:40;display:flex;align-items:flex-end;justify-content:center}
 .sheet{background:var(--ink);border:1px solid var(--line);border-bottom:0;border-radius:22px 22px 0 0;width:100%;max-width:440px;max-height:94vh;max-height:calc(100dvh - 12px - env(safe-area-inset-top));overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:18px 16px 0;display:flex;flex-direction:column;gap:16px}
+.sqpick{display:flex;align-items:center;gap:10px;width:100%;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:11px 12px;text-align:left;font-size:15px}
+.sqpick .who b{font-weight:700}
+.sqi{min-width:26px;height:26px;padding:0 5px;border-radius:7px;display:grid;place-items:center;font-weight:800;font-size:12px;background:var(--cta);color:var(--ink);flex:none}
+.sqmenu{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden;box-shadow:0 14px 34px rgba(0,0,0,.45)}
+.sqmenu .ck{display:flex;align-items:center;gap:11px;width:100%;padding:12px 13px;border:0;border-top:1px solid var(--line);background:transparent;font-weight:600;font-size:15px;text-align:left}
+.sqmenu .ck:first-child{border-top:0}
+.sqmenu .ck .hint{margin-left:auto;font-size:12.5px;color:var(--muted);font-weight:500}
+.sqmenu .box{width:20px;height:20px;border-radius:5px;border:1.5px solid #5a5f99;display:grid;place-items:center;flex:none;font-size:13px;font-weight:900}
+.sqmenu .ck.on .box{background:var(--cta);border-color:var(--cta);color:var(--ink)}
 .sheetfoot{position:sticky;bottom:0;z-index:3;margin:auto -16px 0;padding:12px 16px calc(14px + env(safe-area-inset-bottom,0px));background:var(--ink);border-top:1px solid var(--line)}
 .sheet>*{flex-shrink:0}
 .stepper{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -736,11 +745,24 @@ function vLock(){
     <button class="btn block" data-a="unlock" style="margin-top:14px">Close preview</button></div></div>`;
 }
 const REP={none:"Just this day",daily:"Every day",weekly:""};
+/* who the new time is for: one line that opens a tick list */
+function squadPicker(qs){
+  const sel=sheet.squads==="all"?null:qs.filter(q=>sheet.squads.includes(q.id));
+  const names=sel?sel.map(q=>`<b>${esc(q.name)}</b>`):null;
+  const who=!sel?"<b>All squads</b>":names.length===1?names[0]+" only":names.length===2?names.join(" and "):names.slice(0,-1).join(", ")+" and "+names[names.length-1];
+  const icons=(sel||[]).slice(0,3).map(q=>`<span class="sqi">${esc(q.name.slice(0,1).toUpperCase())}</span>`).join("")||`<span class="sqi">All</span>`;
+  const open=!!sheet.pickOpen;
+  return `<div class="stack" style="gap:6px"><p class="muted small" id="pickLbl">Choose squad</p>
+  <button class="sqpick" data-a="sqMenu" aria-expanded="${open}" aria-labelledby="pickLbl"><span class="row" style="gap:4px">${icons}</span><span class="grow who">${who}</span><span class="muted small">${open?"Done ▴":"Change ▾"}</span></button>
+  ${open?`<div class="sqmenu" role="group" aria-label="Choose squad"><button class="ck${sheet.squads==="all"?" on":""}" data-a="sqAll" aria-pressed="${sheet.squads==="all"}"><span class="box" aria-hidden="true">${sheet.squads==="all"?"✓":""}</span>All squads<span class="hint">Every squad, now and later</span></button>
+    ${qs.map(q=>{const on=sheet.squads!=="all"&&sheet.squads.includes(q.id);return `<button class="ck${on?" on":""}" data-a="sqTog" data-id="${q.id}" aria-pressed="${on}"><span class="box" aria-hidden="true">${on?"✓":""}</span>${esc(q.name)}</button>`}).join("")}</div>`:""}</div>`;
+}
 function vSheet(){
   const qs=mySquads(),day=dayKey(sheet.off),d0=slotAbs(day,0),d1=slotAbs(day,SLOTS),mine=((S.iv||{}).me||[]).filter(x=>x.s<d1&&x.e>d0).sort((x,y)=>x.s-y.s);
   const wd=dateText(sheet.off,{weekday:"long"});
   return `<div class="scrim" data-a="closeSheet"><div class="sheet" role="dialog" aria-label="Set dub availability" data-stop>
     <div class="row"><h2 class="grow">When can you dub?</h2><button class="btn sm ghost" data-a="closeSheet">Close</button></div>
+    ${squadPicker(qs)}
     <div class="chips">${[0,1,2,3,4,5,6].map(o=>`<button class="chip ${o===sheet.off?"on":""}" data-a="sheetDay" data-off="${o}">${esc(dayLabel(o))}</button>`).join("")}</div>
     ${mine.length?`<div class="stack" style="gap:8px"><p class="muted small">Already set for this day</p>${mine.map(x=>`<div class="row"><i class="dot solo"></i><span class="grow">${hm(x.s)} to ${hm(x.e)} <span class="muted small">${x.w.squads==="all"?"all squads":x.w.squads.map(id=>esc(squad(id)?squad(id).name:"")).join(", ")}${x.w.repeat==="daily"?", repeats daily":x.w.repeat==="weekly"?", repeats weekly":""}</span></span><button class="btn sm ghost" data-a="delWin" data-id="${x.w.id}">${x.w.repeat&&x.w.repeat!=="none"?"Remove all":"Remove"}</button></div>`).join("")}</div>`:""}
     <div><p class="muted small">Drag either end to change when you start or stop. Drag the yellow band to move the whole time.</p>
@@ -759,7 +781,6 @@ function vSheet(){
     </svg></div>
     </div>
     <div class="stack" style="gap:8px"><p class="muted small">Repeat</p><div class="row wrap">${["none","daily","weekly"].map(r=>`<button class="chip ${sheet.repeat===r?"on":""}" data-a="rep" data-r="${r}">${r==="weekly"?"Every "+esc(wd):REP[r]}</button>`).join("")}</div></div>
-    <div class="stack" style="gap:8px"><p class="muted small">Share with</p><div class="row wrap"><button class="chip ${sheet.squads==="all"?"on":""}" data-a="sqAll">All squads</button>${qs.map(q=>`<button class="chip ${sheet.squads!=="all"&&sheet.squads.includes(q.id)?"on":""}" data-a="sqTog" data-id="${q.id}">${esc(q.name)}</button>`).join("")}</div></div>
     <div class="sheetfoot"><button class="btn cta block" id="saveBtn" data-a="saveWin"></button></div>
   </div></div>`;
 }
@@ -972,6 +993,7 @@ const A={
   openSheet(){openSheet()},closeSheet(){sheet=null},
   sheetDay(d){sheet.off=+d.off;if(!sheet.touched)Object.assign(sheet,defaultWindow(sheet.off));else if(sheet.start<minStart()){sheet.start=minStart();sheet.dur=Math.min(sheet.dur,SLOTS-sheet.start)}},
   rep(d){sheet.repeat=d.r},
+  sqMenu(){sheet.pickOpen=!sheet.pickOpen},
   sqAll(){sheet.squads="all"},
   sqTog(d){let l=sheet.squads==="all"?[]:sheet.squads.slice();l=l.includes(d.id)?l.filter(x=>x!==d.id):l.concat(d.id);sheet.squads=l.length?l:"all"},
   async saveWin(){prefs.set("lastWin",sheet.start+","+(sheet.start+sheet.dur));const off=sheet.off,args={p_day:dayKey(off),p_a:sheet.start,p_b:sheet.start+sheet.dur,p_repeat:sheet.repeat,p_squads:sheet.squads==="all"?null:sheet.squads};
