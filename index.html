@@ -556,15 +556,16 @@ function blockCard(b,opts={}){
       return `<div class="rr">${avatar(m).replace('class="av ','class="av xs ')}<span class="nm">${m==="me"?"You":esc(person(m).name)}</span><span class="when2">${w}</span></div>`}).join("");
     const rep=b.segs.reduce((x,y)=>y.members.length>x.members.length?y:x,b.segs[0]),g=pickGame(q,rep.members),first=g.rounds[0]||[];
     const picks=first.length?`<div class="pk"><div class="pkh">How the game was picked</div>${first.map(x=>`<div class="row" style="gap:8px"><span class="row" style="gap:3px">${x.voters.map(v=>avatar(v).replace('class="av ','class="av xs ')).join("")}</span><span>${esc(x.game)}</span></div>`).join("")}</div>`:"";
-    body=`<div class="exp"><div class="roster">${roster}</div>${picks}${opts.open?`<button class="btn sm ${b.tier==="full"?"":"ghost"}" data-a="openSquad" data-id="${q.id}" data-off="${b.off}" style="align-self:flex-start;${b.tier==="full"?"background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.5)":""}">Open ${esc(q.name)} schedule</button>`:""}</div>`;
+    body=`<div class="exp"><div class="roster">${roster}</div>${picks}</div>`;
   }
+  const openBtn=opts.open?`<button class="btn sm ${b.tier==="full"?"":"ghost"}" data-a="openSquad" data-id="${q.id}" data-off="${b.off}" style="align-self:flex-start;margin-top:6px;${b.tier==="full"?"background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.5)":""}">Open ${esc(q.name)} schedule</button>`:"";
   return `<div class="block ${b.tier} tap${live?" is-live":""}" data-a="toggleCard" data-id="${esc(b.id)}" role="button" tabindex="0" aria-expanded="${open}" aria-label="${tier}">
     <div class="row"><span class="tier grow">DubTime</span>${live?'<span class="live">Live now</span>':""}<span class="chev" aria-hidden="true">${open?"▴":"▾"}</span></div>
     ${b.tier==="full"?'<div class="fs">Full-Squad</div>':""}
     <div class="when">${opts.day&&b.off!==0?`<span class="nw">${esc(dayLabel(b.off))}</span> `:""}<span class="nw">${range(b.a,b.b)}</span></div>
     ${opts.squad?`<div class="muted small sqname">${sqMini(q)}${esc(q.name)}</div>`:""}
     <div>${b.game?`Play <strong>${esc(b.game)}</strong>`:'<span class="muted">No ranked game fits this head count yet</span>'}</div>
-    ${body}
+    ${body}${openBtn}
   </div>`;
 }
 
