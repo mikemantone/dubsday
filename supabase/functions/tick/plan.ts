@@ -13,12 +13,13 @@ const SLOT = 30 * MIN;
 
 export type Win = { uid: string; day: string; a: number; b: number; repeat: string; squads: string[] | null; tz: string };
 export type Commit = { uid: string; starts_at: string; ends_at: string; squad: string };
+export type NoDubs = { uid: string; day: string; tz: string; squads: string[] | null };
 export type Squad = { id: string; name: string; members: string[] };
 export type Game = { name: string; need: string };
 export type Person = { name: string; notif: Record<string, boolean>; tz: string };
 export type Rec = { found: boolean; warn: boolean; live: boolean };
 export type State = {
-  squads: Squad[]; avail: Win[]; commits: Commit[]; people: Record<string, Person>;
+  squads: Squad[]; avail: Win[]; commits: Commit[]; nodubs?: NoDubs[]; people: Record<string, Person>;
   rankings: { squad: string; uid: string; games: Game[] }[]; blocks: Record<string, Rec>;
 };
 export type Message = { uid: string; kind: "found" | "warn" | "live"; title: string; body: string; url: string; tag: string };
@@ -96,6 +97,8 @@ export function plan(st: State, now: number, site: string) {
     }
   }
   const commits = st.commits.map((c) => ({ uid: c.uid, s: Date.parse(c.starts_at), e: Date.parse(c.ends_at), squad: c.squad }));
+  // "No dubs": a whole dub day (4am to 4am in that person's zone) when they can't play
+  const nodubs = (st.nodubs || []).map((n) => ({ uid: n.uid, squads: n.squads, s: dayBase(n.day, n.tz || NY), e: dayBase(addDays(n.day, 1), n.tz || NY) }));
 
   const pickGame = (q: Squad, members: string[]) => {
     const n = q.members.length, k = members.length;
@@ -151,7 +154,8 @@ export function plan(st: State, now: number, site: string) {
   for (const q of st.squads) {
     if (q.members.length < 2) continue;
     const mine = (m: string) => (iv[m] || []).filter((x) => x.squads === null || x.squads.includes(q.id));
-    const elsewhere = (m: string) => commits.filter((c) => c.uid === m && c.squad !== q.id);
+    const elsewhere = (m: string) => commits.filter((c) => c.uid === m && c.squad !== q.id)
+      .concat(nodubs.filter((n) => n.uid === m && (n.squads === null || n.squads.includes(q.id))).map((n) => ({ uid: m, s: n.s, e: n.e, squad: "" })));
     const cuts = new Set<number>();
     for (const m of q.members) {
       for (const x of mine(m)) { cuts.add(x.s); cuts.add(x.e); }
