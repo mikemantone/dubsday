@@ -359,7 +359,7 @@ function applyState(st){
   S.rank={};st.rankings.forEach(r=>{(S.rank[r.squad]=S.rank[r.squad]||{})[id(r.uid)]=r.games});
   S.avail={me:[]};st.avail.forEach(w=>{const u=id(w.uid);(S.avail[u]=S.avail[u]||[]).push({id:w.id,day:w.day,a:w.a,b:w.b,repeat:w.repeat,tz:w.tz||"America/New_York",squads:w.squads===null?"all":w.squads})});
   S.commits=st.commits.map(c=>({uid:id(c.uid),s:Date.parse(c.starts_at),e:Date.parse(c.ends_at),squad:c.squad}));
-  S.nodubs=(st.nodubs||[]).map(n=>({uid:id(n.uid),day:n.day,tz:n.tz||"America/New_York",squads:n.squads===null?"all":n.squads,s:dayBaseFor(n.day,n.tz||"America/New_York"),e:dayBaseFor(addDays(n.day,1),n.tz||"America/New_York")}));expand();
+  S.nodubs=(st.nodubs||[]).map(n=>({uid:id(n.uid),day:n.day,tz:n.tz||"America/New_York",squads:n.squads===null?"all":n.squads,weekly:!!n.weekly,s:dayBaseFor(n.day,n.tz||"America/New_York"),e:dayBaseFor(addDays(n.day,1),n.tz||"America/New_York")}));expand();
   if(S.squadId&&!S.squads.some(q=>q.id===S.squadId))S.squadId=null;
   if(S.linkInvite&&S.squads.some(q=>q.id===S.linkInvite.squad)){S.linkInvite=null;prefs.set("invite",null)}
 }
@@ -405,6 +405,8 @@ function hasUpcomingAvail(){const n=Date.now();return ((S.iv||{}).me||[]).some(x
 /* No dubs: someone said they can't play that dub day, for this squad */
 function outAt(uid,sq,t){return (S.nodubs||[]).some(n=>n.uid===uid&&(n.squads==="all"||n.squads.includes(sq))&&n.s<=t&&t<n.e)}
 function outOn(sq,day){return (S.nodubs||[]).some(n=>n.uid==="me"&&n.day===day&&(n.squads==="all"||n.squads.includes(sq)))}
+function outWeekly(list,day){return (S.nodubs||[]).some(n=>n.uid==="me"&&n.weekly&&n.day===day&&list.some(q=>n.squads==="all"||n.squads.includes(q.id)))}
+function weekdayOf(off){return dateText(off,{weekday:"long"})}
 function outAll(day){const qs=mySquads();return qs.length>0&&qs.every(q=>outOn(q.id,day))}
 function whenWord(off){return off===0?"today":off===1?"tomorrow":dayLabel(off)}
 function outTag(off){return off===0?"Out today":"Out "+dateText(off,{weekday:"short"})}
@@ -698,12 +700,16 @@ function ndPanel(){const nd=S.nd,day=dayKey(nd.off),when=whenWord(nd.off),qs=myS
   return `<div class="panel stack nd"><div class="row"><i class="sw away" aria-hidden="true"></i><strong class="grow">No dubs</strong></div>
     <div class="chips">${[0,1,2,3,4,5,6].map(o=>`<button class="chip ${o===nd.off?"on":""}" data-a="ndDay" data-off="${o}">${esc(dayLabel(o))}</button>`).join("")}</div>
     ${squadPicker(qs)}
-    <p class="small" style="margin:0">Squadmates in ${nd.squads==="all"?"all your squads":sqNames(sel)} will see you can't play ${esc(when)}. Your times for that day are set aside; if they repeat weekly, they come back next week.</p>
+    <p class="small" style="margin:0">Squadmates in ${nd.squads==="all"?"all your squads":sqNames(sel)} will see you can't play ${esc(when)}${nd.repeat==="weekly"?`, and every ${esc(weekdayOf(nd.off))} after that until you stop it`:""}. ${nd.repeat==="weekly"?"Your times on those days are set aside and come back when you stop.":"Your times for that day are set aside; if they repeat weekly, they come back next week."}</p>
     ${drop?`<p class="small warnnote" style="margin:0">You'll drop out of ${drop} DubTime${drop===1?"":"s"} ${esc(when)}.</p>`:""}
+    <div class="stack" style="gap:8px"><p class="muted small" style="margin:0">Repeat</p><div class="row wrap">${["none","weekly"].map(r=>`<button class="chip ${(nd.repeat||"none")===r?"on":""}" data-a="ndRep" data-r="${r}">${r==="weekly"?"Every "+esc(weekdayOf(nd.off)):"Just this day"}</button>`).join("")}</div></div>
     <div class="row wrap"><button class="btn sm primary" data-a="ndConfirm">Confirm</button><button class="btn sm ghost" data-a="ndClose">Cancel</button></div></div>`}
 function ndButton(){return `<button class="btn block ndbtn" data-a="ndOpen"><i class="sw away" aria-hidden="true"></i>No dubs</button>`}
-function outCard(off,list,key){const when=whenWord(off);
-  return `<div class="panel stack chosen"><div class="row"><i class="sw away" aria-hidden="true"></i><strong>You're out ${esc(when)}</strong></div><p>Your squadmates in ${sqNames(list)} can see you can't play ${esc(when)}.</p><button class="btn sm" data-a="ndUndo" data-k="${dayKey(off)}|${key}" style="align-self:flex-start">Change my mind</button></div>`}
+function outCard(off,list,key){const when=whenWord(off),day=dayKey(off),k=day+"|"+key,wk=outWeekly(list,day),wdn=weekdayOf(off);
+  const ask=wk&&S.ndAsk===k;
+  return `<div class="panel stack chosen"><div class="row"><i class="sw away" aria-hidden="true"></i><strong>You're out ${esc(when)}</strong></div><p>${wk?`No dubs every ${esc(wdn)}. `:""}Your squadmates in ${sqNames(list)} can see you can't play ${esc(when)}.</p>${ask
+    ?`<p style="margin:0">Come back for:</p><div class="row wrap"><button class="btn sm" data-a="ndUndo" data-k="${k}">Just ${esc(when)}</button><button class="btn sm" data-a="ndUndo" data-k="${k}" data-every="1">Every ${esc(wdn)}</button><button class="btn sm ghost" data-a="ndAskClose">Cancel</button></div>`
+    :`<button class="btn sm" data-a="${wk?"ndAsk":"ndUndo"}" data-k="${k}" style="align-self:flex-start">Change my mind</button>`}</div>`}
 function ndHome(){const qs=mySquads();if(!qs.length)return "";
   let h=S.nd&&S.nd.where==="home"?ndPanel():ndButton();
   for(let o=0;o<7;o++)if(outAll(dayKey(o)))h+=outCard(o,qs,"all");
@@ -851,7 +857,7 @@ function vSheet(){
     <div class="row"><h2 class="grow">When can you dub?</h2><button class="btn sm ghost" data-a="closeSheet">Close</button></div>
     ${squadPicker(qs)}
     <div class="chips">${[0,1,2,3,4,5,6].map(o=>`<button class="chip ${o===sheet.off?"on":""}" data-a="sheetDay" data-off="${o}">${esc(dayLabel(o))}</button>`).join("")}</div>
-    ${(()=>{const outs=sheetOuts();return outs.length?`<div class="ndnote"><i class="sw away" aria-hidden="true"></i><span>You said <b>No dubs</b> for ${sqNames(outs)} ${esc(whenWord(sheet.off))}. Saving a time here cancels it${outs.length<(sheet.squads==="all"?mySquads().length:sheet.squads.length)?" for "+(outs.length===1?esc(outs[0].name):"those squads"):""}, and your squadmates will see you as available.</span></div>`:""})()}
+    ${(()=>{const outs=sheetOuts();return outs.length?`<div class="ndnote"><i class="sw away" aria-hidden="true"></i><span>You said <b>No dubs</b> for ${sqNames(outs)} ${esc(whenWord(sheet.off))}. Saving a time here cancels it${outs.length<(sheet.squads==="all"?mySquads().length:sheet.squads.length)?" for "+(outs.length===1?esc(outs[0].name):"those squads"):""}, and your squadmates will see you as available.${outWeekly(outs,dayKey(sheet.off))?` Only this ${esc(wd)} changes; your other ${esc(wd)}s stay No dubs.`:""}</span></div>`:""})()}
     ${mine.length?`<div class="stack" style="gap:8px"><p class="muted small">Already set for this day</p>${mine.map(x=>`<div class="row"><i class="dot solo"></i><span class="grow">${hm(x.s)} to ${hm(x.e)} <span class="muted small">${x.w.squads==="all"?"all squads":x.w.squads.map(id=>esc(squad(id)?squad(id).name:"")).join(", ")}${x.w.repeat==="daily"?", repeats daily":x.w.repeat==="weekly"?", repeats weekly":""}</span></span><button class="btn sm ghost" data-a="delWin" data-id="${x.w.id}">${x.w.repeat&&x.w.repeat!=="none"?"Remove all":"Remove"}</button></div>`).join("")}</div>`:""}
     <div><p class="muted small">Drag either end to change when you start or stop. Drag the yellow band to move the whole time.</p>
     <div class="dialwrap"><svg id="dial" viewBox="0 0 300 300" aria-label="Availability clock">
@@ -1055,8 +1061,8 @@ const A={
   gameUp(d){const l=S.rankDraft,i=+d.i;[l[i-1],l[i]]=[l[i],l[i-1]]},gameDown(d){const l=S.rankDraft,i=+d.i;[l[i+1],l[i]]=[l[i],l[i+1]]},
   gameDel(d){S.rankDraft.splice(+d.i,1)},
   gameAdd(){const v=val("newGame").trim().slice(0,60);if(v&&S.rankDraft.length<5&&!S.rankDraft.some(g=>g.name.toLowerCase()===v.toLowerCase()))S.rankDraft.push({name:v,need:"2"});S.addOther=false},
-  tab(d){S.tab=d.id;S.squadId=null;S.editSq=null;S.nd=null;S.rankFor=null;S.confirmDelete=false;S.confirmRemove=null;S.confirmLeave=false;S.confirmUnfriend=null;S.searchQ="";S.searchRes=[]},
-  openSquad(d){S.nd=null;S.editSq=null;S.rankFor=null;S.confirmRemove=null;S.confirmLeave=false;S.tab="squads";S.squadId=d.id;S.dayOff=+d.off||0;scrollTo(0,0)},backSquads(){S.squadId=null;S.editSq=null;S.nd=null},
+  tab(d){S.tab=d.id;S.squadId=null;S.editSq=null;S.nd=null;S.ndAsk=null;S.rankFor=null;S.confirmDelete=false;S.confirmRemove=null;S.confirmLeave=false;S.confirmUnfriend=null;S.searchQ="";S.searchRes=[]},
+  openSquad(d){S.nd=null;S.ndAsk=null;S.editSq=null;S.rankFor=null;S.confirmRemove=null;S.confirmLeave=false;S.tab="squads";S.squadId=d.id;S.dayOff=+d.off||0;scrollTo(0,0)},backSquads(){S.squadId=null;S.editSq=null;S.nd=null;S.ndAsk=null},
   day(d){S.dayOff=+d.off},
   async acceptInvite(d){await withAlerts(()=>rpc("respond_squad_invitation",{sid:d.id,accept:true}));afterJoin(d.id)},
   async declineInvite(d){await rpc("respond_squad_invitation",{sid:d.id,accept:false});await sync()},
@@ -1099,11 +1105,15 @@ const A={
   ndOpen(){const inSq=S.tab==="squads"&&S.squadId&&squad(S.squadId);S.nd={where:inSq?"squad":"home",off:inSq?S.dayOff:0,squads:inSq?[S.squadId]:"all",pickOpen:false}},
   ndClose(){S.nd=null},
   ndDay(d){S.nd.off=+d.off},
+  ndRep(d){S.nd.repeat=d.r},
+  ndAsk(d){S.ndAsk=d.k},ndAskClose(){S.ndAsk=null},
   async ndConfirm(){const nd=S.nd,qs=mySquads(),sel=nd.squads==="all"?qs:qs.filter(q=>nd.squads.includes(q.id));
-    await rpc("set_no_dubs",{p_day:dayKey(nd.off),p_squads:nd.squads==="all"?null:nd.squads});S.nd=null;await sync();
-    note("No dubs "+whenWord(nd.off),(nd.squads==="all"?"All your squads":sel.map(q=>q.name).join(" and "))+" can see you can't play.")},
+    await rpc("set_no_dubs",{p_day:dayKey(nd.off),p_squads:nd.squads==="all"?null:nd.squads,p_repeat:nd.repeat||"none"});S.nd=null;await sync();
+    note(nd.repeat==="weekly"?"No dubs every "+weekdayOf(nd.off):"No dubs "+whenWord(nd.off),(nd.squads==="all"?"All your squads":sel.map(q=>q.name).join(" and "))+" can see you can't play.")},
   async ndUndo(d){const [day,key]=d.k.split("|"),off=[0,1,2,3,4,5,6].find(o=>dayKey(o)===day)||0,list=key==="all"?mySquads():[squad(key)].filter(Boolean);
-    await rpc("clear_no_dubs",{p_day:day,p_squads:key==="all"?null:[key]});await sync();
+    const every=!!d.every;S.ndAsk=null;
+    await rpc("clear_no_dubs",{p_day:day,p_squads:key==="all"?null:[key],p_every:every});await sync();
+    if(every){note("No more weekly No dubs",(key==="all"?"You're back in every ":"You're back in for "+list[0].name+" every ")+weekdayOf(off)+".");return}
     const had=list.some(q=>{for(let x=0;x<SLOTS;x++)if(freeFor("me",q.id,day,x))return true;return false});
     note(key==="all"?"You're back in "+whenWord(off)+".":"You're back in for "+list[0].name+" "+whenWord(off)+".",had?(key==="all"?"Your times for "+list.map(q=>q.name).join(" and ")+" are back.":"Your times are back."):"Add your times so your squad knows when.")},
   async unpick(d){const [day,a,b]=d.k.split("|"),s0=new Date(slotAbs(day,+a)).toISOString(),s1=new Date(slotAbs(day,+b)).toISOString();
