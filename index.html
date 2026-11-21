@@ -341,7 +341,7 @@ function needOptions(name,n,cur){const max=PARTY[name]?PARTY[name][0]:99,out=["2
   return out.sort((x,y)=>(x==="full"?99:+x)-(y==="full"?99:+y))}
 const GAME_IDEAS=["Apex Legends","Battlefield 6","Call of Duty: Warzone","Enshrouded","Fortnite","Gears of War: E-Day","Halo Infinite","Helldivers 2","Minecraft","Monster Hunter Wilds","Overwatch 2","Rocket League","Sid Meier's Civilization VII","V Rising","Valheim"];
 function fresh(){return {step:"loading",tab:"home",squadId:null,dayOff:0,me:null,squads:[],invites:[],friends:[],reqIn:[],reqOut:[],avail:{me:[]},commits:[],rank:{},
-  notif:{found:true,warn:true,live:true},hasSession:false,google:false,email:"",linkInvite:null,searchQ:"",searchRes:[],sqLinks:{},open:new Set()}}
+  notif:{found:true,warn:true,live:true,rollcall:true},hasSession:false,google:false,email:"",linkInvite:null,searchQ:"",searchRes:[],sqLinks:{},open:new Set()}}
 let S=fresh();
 const prefs={get(k){try{return localStorage.getItem("dubsday-"+k)}catch(e){return null}},set(k,v){try{v==null?localStorage.removeItem("dubsday-"+k):localStorage.setItem("dubsday-"+k,v)}catch(e){}}};
 function persist(){}
@@ -350,7 +350,7 @@ function applyState(st){
   if(!st||!st.me){S.me=null;ME=null;return}
   ME=st.me.id;const id=x=>x===ME?"me":x;
   S.me={name:st.me.first_name,username:st.me.gamertag,friendToken:st.me.friend_token,google:S.google};TZ=st.me.tz||"America/New_York";
-  S.notif=Object.assign({found:true,warn:true,live:true},st.me.notif||{});
+  S.notif=Object.assign({found:true,warn:true,live:true,rollcall:true},st.me.notif||{});
   USERS={};for(const k in st.people)USERS[k]=st.people[k];
   st.req_in.concat(st.req_out).forEach(r=>{if(!USERS[r.id])USERS[r.id]={name:null,u:r.u}});
   S.friends=st.friends;S.reqIn=st.req_in.map(r=>r.id);S.reqOut=st.req_out.map(r=>r.id);
@@ -815,7 +815,7 @@ function vProfile(){
   <div class="panel stack"><h3>Notifications</h3>
     ${pushOn()?`<p class="small"><i class="dot dub"></i> Notifications are on for this device.</p>`:`<button class="btn primary" data-a="enablePush">Turn on notifications</button>${installed()?"":`<p class="note">On iPhone, add DubsDay to your Home Screen first and open it from there. Notifications only work from the Home Screen app.</p>`}`}
     ${err("push")}
-    ${t("found","DubTime found","The moment an overlap exists")}${t("warn","15-minute warning","Before each DubTime starts")}${t("live","DubTime is live","When a DubTime starts")}
+    ${t("found","DubTime found","The moment an overlap exists")}${t("warn","15-minute warning","Before each DubTime starts")}${t("live","DubTime is live","When a DubTime starts")}${t("rollcall","Roll call","6:30pm, when a squadmate has set times for today and you haven't set yours or tapped No dubs")}
     <button class="btn" data-a="lock">Preview on a lock screen</button>
     <p class="note">The always-on lock screen countdown needs the iPhone app, planned as the next phase.</p></div>
   <p class="muted small">Signed in as @${esc(S.me.username)}</p>

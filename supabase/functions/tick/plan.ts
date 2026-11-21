@@ -22,7 +22,7 @@ export type State = {
   squads: Squad[]; avail: Win[]; commits: Commit[]; nodubs?: NoDubs[]; people: Record<string, Person>;
   rankings: { squad: string; uid: string; games: Game[] }[]; blocks: Record<string, Rec>;
 };
-export type Message = { uid: string; kind: "found" | "warn" | "live"; title: string; body: string; url: string; tag: string };
+export type Message = { uid: string; kind: "found" | "warn" | "live" | "rollcall"; title: string; body: string; url: string; tag: string };
 
 const fmts: Record<string, Intl.DateTimeFormat> = {};
 export function tzParts(ms: number, tz: string) {
@@ -86,19 +86,19 @@ export function plan(st: State, now: number, site: string) {
 
   // every availability window, expanded to real start and end instants
   const today = new Date(now).toISOString().slice(0, 10);
-  const iv: Record<string, { s: number; e: number; squads: string[] | null }[]> = {};
+  const iv: Record<string, { s: number; e: number; squads: string[] | null; d: string }[]> = {};
   for (const w of st.avail) {
     const list = iv[w.uid] ||= [];
     for (let k = -3; k <= 9; k++) {
       const d = addDays(today, k);
       if (!winOn(w, d)) continue;
       const b = dayBase(d, w.tz || NY);
-      list.push({ s: b + w.a * SLOT, e: b + w.b * SLOT, squads: w.squads });
+      list.push({ s: b + w.a * SLOT, e: b + w.b * SLOT, squads: w.squads, d });
     }
   }
   const commits = st.commits.map((c) => ({ uid: c.uid, s: Date.parse(c.starts_at), e: Date.parse(c.ends_at), squad: c.squad }));
   // "No dubs": a whole dub day (4am to 4am in that person's zone) when they can't play
-  const nodubs = (st.nodubs || []).map((n) => ({ uid: n.uid, squads: n.squads, s: dayBase(n.day, n.tz || NY), e: dayBase(addDays(n.day, 1), n.tz || NY) }));
+  const nodubs = (st.nodubs || []).map((n) => ({ uid: n.uid, day: n.day, squads: n.squads, s: dayBase(n.day, n.tz || NY), e: dayBase(addDays(n.day, 1), n.tz || NY) }));
 
   const pickGame = (q: Squad, members: string[]) => {
     const n = q.members.length, k = members.length;
@@ -131,7 +131,8 @@ export function plan(st: State, now: number, site: string) {
   // Records from before evenings were introduced mean this is the first run of
   // the new rules: those DubTimes were already announced, so record without sending.
   const keys = Object.keys(st.blocks);
-  const seed = keys.length > 0 && !keys.some((k) => k.startsWith("v3|"));
+  // (Roll call records don't count: they say nothing about DubTimes.)
+  const seed = keys.some((k) => !k.startsWith("rc|")) && !keys.some((k) => k.startsWith("v3|"));
 
   const horizon = now + 7 * 864e5;
   const next: Record<string, Rec & { ends_at: string }> = {};
@@ -279,5 +280,42 @@ export function plan(st: State, now: number, site: string) {
         url: squads.length === 1 ? `${site}/?squad=${squads[0]}` : site, tag: "found|" + r + "|" + now });
     }
   }
+  // "Roll call": at 6:30pm (each person's own time) on a dub day where a squadmate has set times
+  // for the squad, nudge everyone in it who hasn't set times or tapped No dubs for it that day.
+  for (const k of keys) if (k.startsWith("rc|") && k.split("|")[3] >= addDays(today, -2)) {
+    next[k] = { ...st.blocks[k], ends_at: new Date(Date.parse(k.split("|")[3]) + 3 * 864e5).toISOString() };
+  }
+  const inFor = (m: string, q: Squad, day: string) => (iv[m] || []).some((x) => x.d === day && (x.squads === null || x.squads.includes(q.id)));
+  const outFor = (m: string, q: Squad, day: string) => nodubs.some((n) => n.uid === m && n.day === day && (n.squads === null || n.squads.includes(q.id)));
+  for (const q of st.squads) {
+    if (q.members.length < 2) continue;
+    for (const r of q.members) {
+      const tz = tzOf(r), p = tzParts(now, tz), mins = p.hour * 60 + p.minute;
+      if (mins < 18 * 60 + 30 || mins >= 19 * 60) continue;
+      const day = dubDayKey(now, tz), key = ["rc", q.id, r, day].join("|");
+      if (st.blocks[key] || next[key]) continue;
+      if (inFor(r, q, day) || outFor(r, q, day)) continue;
+      const ready = q.members.filter((m) => m !== r && inFor(m, q, day));
+      if (!ready.length) continue;
+      next[key] = { found: true, warn: true, live: true, ends_at: new Date(Date.parse(day) + 3 * 864e5).toISOString() };
+      if (seed) continue;
+      out.push({ uid: r, kind: "rollcall", title: `${q.name} is waiting on you`, body: rollCallText(ready.map(nameOf), key),
+        url: `${site}/?squad=${q.id}`, tag: key });
+    }
+  }
   return { next, out, seed };
+}
+
+// Deliberately a little savage. Picks one of three lines, steady for the same person and day.
+export function rollCallText(names: string[], key: string) {
+  const n = names.length, plural = n > 1;
+  const who = n === 1 ? names[0] : n === 2 ? names[0] + " and " + names[1] : `${n} squadmates`;
+  const lines = [
+    `${who} already set ${plural ? "their " : ""}times for tonight. You? Radio silence. Add yours or tap No dubs.`,
+    `${who} showed up. You're ghosting your own squad. Set your times or tap No dubs and own it.`,
+    `${who} ${plural ? "have" : "has"} set ${plural ? "their " : ""}times. Every squad has that one guy. Tonight it's you. Fix it.`,
+  ];
+  let h = 0;
+  for (const c of key) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return lines[h % lines.length];
 }
