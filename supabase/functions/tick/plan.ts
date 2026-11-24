@@ -11,7 +11,7 @@ const PARTY: Record<string, number> = {
 };
 const SLOT = 30 * MIN;
 
-export type Win = { uid: string; day: string; a: number; b: number; repeat: string; squads: string[] | null; tz: string };
+export type Win = { uid: string; day: string; a: number; b: number; repeat: string; squads: string[] | null; tz: string; skip?: string[] };
 export type Commit = { uid: string; starts_at: string; ends_at: string; squad: string };
 export type NoDubs = { uid: string; day: string; tz: string; squads: string[] | null };
 export type Squad = { id: string; name: string; members: string[] };
@@ -59,6 +59,7 @@ export function addDays(day: string, n: number) {
 }
 const weekday = (day: string) => new Date(day + "T12:00:00Z").getUTCDay();
 function winOn(w: Win, day: string) {
+  if (w.skip && w.skip.includes(day)) return false; // "just this day" removed or edited
   if (w.day === day) return true;
   if (!w.repeat || w.repeat === "none" || day < w.day) return false;
   return w.repeat === "daily" || weekday(w.day) === weekday(day);

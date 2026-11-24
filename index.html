@@ -220,6 +220,7 @@ details.why ol{margin:6px 0 0;padding-left:18px}
 .sqmini.letter{font-family:var(--display);font-weight:900;font-size:12px;color:var(--text)}
 .sqname{display:inline-flex;align-items:center;gap:7px}
 .sqpick .who{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}
+.sheet .row.editing{border:2px solid var(--cta);border-radius:12px;padding:8px 10px}
 .btn.ndbtn{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;background:transparent;text-align:left}
 .ndbtn .sw,.nd .sw,.ndnote .sw,.chosen .sw{width:22px;height:14px;border-radius:4px;flex:none}
 .warnnote{color:#ffd7a0}
@@ -357,7 +358,7 @@ function applyState(st){
   S.squads=st.squads.map(q=>({id:q.id,name:q.name,icon:q.icon||null,code:q.code,token:q.invite_token,owner:q.owner?id(q.owner):null,members:(q.members||[]).map(id)}));
   S.invites=st.invites;
   S.rank={};st.rankings.forEach(r=>{(S.rank[r.squad]=S.rank[r.squad]||{})[id(r.uid)]=r.games});
-  S.avail={me:[]};st.avail.forEach(w=>{const u=id(w.uid);(S.avail[u]=S.avail[u]||[]).push({id:w.id,day:w.day,a:w.a,b:w.b,repeat:w.repeat,tz:w.tz||"America/New_York",squads:w.squads===null?"all":w.squads})});
+  S.avail={me:[]};st.avail.forEach(w=>{const u=id(w.uid);(S.avail[u]=S.avail[u]||[]).push({id:w.id,day:w.day,a:w.a,b:w.b,repeat:w.repeat,skip:w.skip||[],tz:w.tz||"America/New_York",squads:w.squads===null?"all":w.squads})});
   S.commits=st.commits.map(c=>({uid:id(c.uid),s:Date.parse(c.starts_at),e:Date.parse(c.ends_at),squad:c.squad}));
   S.nodubs=(st.nodubs||[]).map(n=>({uid:id(n.uid),day:n.day,tz:n.tz||"America/New_York",squads:n.squads===null?"all":n.squads,weekly:!!n.weekly,s:dayBaseFor(n.day,n.tz||"America/New_York"),e:dayBaseFor(addDays(n.day,1),n.tz||"America/New_York")}));expand();
   if(S.squadId&&!S.squads.some(q=>q.id===S.squadId))S.squadId=null;
@@ -396,7 +397,7 @@ function afterJoin(id){const onb=S.step!=="app";S.step="app";S.tab=onb?"home":"s
 function finishRank(){const then=S.rankThenAvail;S.rankFor=null;S.rankDraft=null;if(then)openSheet()}
 
 /* ---------- scheduling logic ---------- */
-function winOn(w,day){if(w.day===day)return true;if(!w.repeat||w.repeat==="none"||day<w.day)return false;
+function winOn(w,day){if(w.skip&&w.skip.includes(day))return false;if(w.day===day)return true;if(!w.repeat||w.repeat==="none"||day<w.day)return false;
   return w.repeat==="daily"||new Date(w.day+"T12:00:00Z").getUTCDay()===new Date(day+"T12:00:00Z").getUTCDay()}
 /* each window, in its owner's time zone, expanded to real start and end instants */
 function expand(){const t0=todayKey();S.iv={};
@@ -859,7 +860,7 @@ function vSheet(){
     ${squadPicker(qs)}
     <div class="chips">${[0,1,2,3,4,5,6].map(o=>`<button class="chip ${o===sheet.off?"on":""}" data-a="sheetDay" data-off="${o}">${esc(dayLabel(o))}</button>`).join("")}</div>
     ${(()=>{const outs=sheetOuts();return outs.length?`<div class="ndnote"><i class="sw away" aria-hidden="true"></i><span>You said <b>No dubs</b> for ${sqNames(outs)} ${esc(whenWord(sheet.off))}. Saving a time here cancels it${outs.length<(sheet.squads==="all"?mySquads().length:sheet.squads.length)?" for "+(outs.length===1?esc(outs[0].name):"those squads"):""}, and your squadmates will see you as available.${outWeekly(outs,dayKey(sheet.off))?` Only this ${esc(wd)} changes; your other ${esc(wd)}s stay No dubs.`:""}</span></div>`:""})()}
-    ${mine.length?`<div class="stack" style="gap:8px"><p class="muted small">Already set for this day</p>${mine.map(x=>`<div class="row"><i class="dot solo"></i><span class="grow">${hm(x.s)} to ${hm(x.e)} <span class="muted small">${x.w.squads==="all"?"all squads":x.w.squads.map(id=>esc(squad(id)?squad(id).name:"")).join(", ")}${x.w.repeat==="daily"?", repeats daily":x.w.repeat==="weekly"?", repeats weekly":""}</span></span><button class="btn sm ghost" data-a="delWin" data-id="${x.w.id}">${x.w.repeat&&x.w.repeat!=="none"?"Remove all":"Remove"}</button></div>`).join("")}</div>`:""}
+    ${mine.length?`<div class="stack" style="gap:8px"><p class="muted small">Already set for this day</p>${mine.map(x=>winRow(x,wd)).join("")}</div>`:""}
     <div><p class="muted small">Drag either end to change when you start or stop. Drag the yellow band to move the whole time.</p>
     <div class="dialwrap"><svg id="dial" viewBox="0 0 300 300" aria-label="Availability clock">
       <circle cx="150" cy="150" r="112" fill="none" stroke="var(--line)" stroke-width="26"/>
@@ -901,8 +902,18 @@ function updateDial(){
   const PILL=12,CAP=4.35,KNOB=9.7,GAP=1,fits=sw-2*KNOB-(PILL+2*CAP)>=2*GAP,mid=a0+sw/2,gd=fits?arcPath(mid-PILL/2,PILL,112):"";
   document.getElementById("gripO").setAttribute("d",gd);document.getElementById("gripI").setAttribute("d",gd);
   const rp=sheet.repeat==="daily"?", every day":sheet.repeat==="weekly"?", weekly":"";
-  document.getElementById("saveBtn").textContent="Save "+range(sheet.start,end)+rp;
+  document.getElementById("saveBtn").textContent=(sheet.edit?"Save changes: ":"Save ")+range(sheet.start,end)+rp;
 }
+/* one time in "Already set for this day": Edit and Remove, asking "just today or every ..." for repeating times */
+function winRow(x,wd){const w=x.w,rp=w.repeat&&w.repeat!=="none",every=w.repeat==="daily"?"Every day":"Every "+wd,everyL="e"+every.slice(1);
+  const who=w.squads==="all"?"all squads":w.squads.map(id=>esc(squad(id)?squad(id).name:"")).join(", ");
+  const meta=who+(w.repeat==="daily"?", repeats daily":w.repeat==="weekly"?", repeats weekly":"");
+  const ed=sheet.edit&&sheet.edit.id===w.id,ask=sheet.ask&&sheet.ask.id===w.id?sheet.ask.k:null,t=`${hm(x.s)} to ${hm(x.e)}`;
+  if(ed)return `<div class="row editing"><i class="dot solo"></i><span class="grow">Editing: ${t} <span class="muted small">${sheet.edit.scope==="one"?"just today":rp?esc(everyL):who}</span></span><button class="btn sm ghost" data-a="winEditCancel">Cancel edit</button></div>`;
+  const row=`<div class="row"><i class="dot solo"></i><span class="grow">${t} <span class="muted small">${meta}</span></span>${ask?"":`<button class="btn sm ghost" data-a="${rp?"winAsk":"winEdit"}" data-id="${w.id}" data-k="ed">Edit</button><button class="btn sm ghost" data-a="${rp?"winAsk":"winRm"}" data-id="${w.id}" data-k="rm" style="color:var(--danger)">Remove</button>`}</div>`;
+  if(ask==="rm")return `<div class="stack" style="gap:8px">${row}<div class="panel stack" style="border-color:var(--danger)"><strong>Remove ${t}?</strong><p class="muted small">This time repeats ${esc(everyL)}.</p><div class="row wrap"><button class="btn sm danger" data-a="winRm" data-id="${w.id}" data-scope="one">Just today</button><button class="btn sm danger" data-a="winRm" data-id="${w.id}" data-scope="all">${esc(every)}</button><button class="btn sm ghost" data-a="winAskClose">Cancel</button></div></div></div>`;
+  if(ask==="ed")return `<div class="stack" style="gap:8px">${row}<div class="panel stack"><strong>Edit ${t}</strong><p class="muted small">This time repeats ${esc(everyL)}. Which do you want to change?</p><div class="row wrap"><button class="btn sm" data-a="winEdit" data-id="${w.id}" data-scope="one">Just today</button><button class="btn sm" data-a="winEdit" data-id="${w.id}" data-scope="all">${esc(every)}</button><button class="btn sm ghost" data-a="winAskClose">Cancel</button></div></div></div>`;
+  return row}
 function nudge(mode,n,base){
   base=base||{start:sheet.start,dur:sheet.dur};sheet.touched=true;const end=base.start+base.dur;
   if(mode==="end")sheet.dur=clamp(end+n,base.start+1,SLOTS)-base.start;
@@ -1088,16 +1099,30 @@ const A={
   a2hsHide(){prefs.set("a2hs","1")},
   lock(){lockOpen=true},unlock(){lockOpen=false},
   openSheet(){openSheet()},closeSheet(){sheet=null},
-  sheetDay(d){sheet.off=+d.off;if(!sheet.touched)Object.assign(sheet,defaultWindow(sheet.off));else if(sheet.start<minStart()){sheet.start=minStart();sheet.dur=Math.min(sheet.dur,SLOTS-sheet.start)}},
+  sheetDay(d){sheet.off=+d.off;sheet.edit=null;sheet.ask=null;if(!sheet.touched)Object.assign(sheet,defaultWindow(sheet.off));else if(sheet.start<minStart()){sheet.start=minStart();sheet.dur=Math.min(sheet.dur,SLOTS-sheet.start)}},
   rep(d){sheet.repeat=d.r},
   sqMenu(){pk().pickOpen=!pk().pickOpen},
   sqAll(){pk().squads="all"},
   sqTog(d){const t=pk();let l=t.squads==="all"?[]:t.squads.slice();l=l.includes(d.id)?l.filter(x=>x!==d.id):l.concat(d.id);t.squads=l.length?l:"all"},
   async saveWin(){prefs.set("lastWin",sheet.start+","+(sheet.start+sheet.dur));const off=sheet.off,args={p_day:dayKey(off),p_a:sheet.start,p_b:sheet.start+sheet.dur,p_repeat:sheet.repeat,p_squads:sheet.squads==="all"?null:sheet.squads};
     const outs=sheetOuts();
-    await withAlerts(async()=>{await rpc("add_availability",args);if(outs.length)await rpc("clear_no_dubs",{p_day:args.p_day,p_squads:outs.map(q=>q.id)})});
+    const ed=sheet.edit;
+    await withAlerts(async()=>{
+      if(ed&&ed.scope==="one"){await rpc("skip_availability",{p_id:ed.id,p_day:args.p_day});await rpc("add_availability",args)}
+      else if(ed)await rpc("update_availability",Object.assign({p_id:ed.id},args));
+      else await rpc("add_availability",args);
+      if(outs.length)await rpc("clear_no_dubs",{p_day:args.p_day,p_squads:outs.map(q=>q.id)})});
     sheet=null;if(S.squadId)S.dayOff=off;if(outs.length)note("No dubs cancelled","You're available again in "+outs.map(q=>q.name).join(" and ")+" "+whenWord(off)+".")},
   async delWin(d){await rpc("delete_availability",{aid:d.id});await sync()},
+  winAsk(d){sheet.ask={id:d.id,k:d.k}},winAskClose(){sheet.ask=null},
+  async winRm(d){const day=dayKey(sheet.off);sheet.ask=null;if(sheet.edit&&sheet.edit.id===d.id)sheet.edit=null;
+    if(d.scope==="one")await rpc("skip_availability",{p_id:d.id,p_day:day});else await rpc("delete_availability",{aid:d.id});await sync()},
+  winEdit(d){const day=dayKey(sheet.off),x=((S.iv||{}).me||[]).find(y=>y.w.id===d.id&&y.s<slotAbs(day,SLOTS)&&y.e>slotAbs(day,0));if(!x)return;const w=x.w;
+    const scope=w.repeat&&w.repeat!=="none"?d.scope:"single";
+    sheet.ask=null;sheet.edit={id:w.id,scope};sheet.touched=true;
+    sheet.start=Math.max(0,Math.round((x.s-slotAbs(day,0))/SLOTMS));sheet.dur=Math.min(SLOTS-sheet.start,Math.round((x.e-x.s)/SLOTMS));
+    sheet.squads=w.squads==="all"?"all":[...w.squads];sheet.repeat=scope==="one"?"none":(w.repeat||"none")},
+  winEditCancel(){sheet.edit=null;Object.assign(sheet,defaultWindow(sheet.off));sheet.touched=false},
   editSquad(){const q=squad(S.squadId);S.editSq={id:q.id,name:q.name,icon:q.icon||""};formErr=""},
   cancelEditSquad(){S.editSq=null;formErr=""},
   pickIcon(d){S.editSq.name=val("sqName");S.editSq.icon=d.ic||""},
